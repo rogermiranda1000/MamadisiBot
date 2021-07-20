@@ -3,7 +3,7 @@ project(MamadisiBotC)
 
 set(CMAKE_CXX_STANDARD 98)
 
-add_executable(MamadisiBotC main.cpp secrets.h MamadisiBot.h)
+add_executable(MamadisiBotC main.cpp secrets.h MamadisiBot.h MamadisiBot.cpp)
 
 add_subdirectory(deps/sleepy-discord)
 target_link_libraries(MamadisiBotC sleepy-discord)
