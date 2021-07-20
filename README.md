@@ -1,8 +1,8 @@
 # MamadisiBot
 
 ## Installation
-> [Sleepy Discord](https://yourwaifu.dev/sleepy-discord/docs/)<br>
-> [Other dependencies](https://yourwaifu.dev/sleepy-discord/docs/setup-standard/)
+- [Sleepy Discord](https://yourwaifu.dev/sleepy-discord/docs/)
+- [Other dependencies](https://yourwaifu.dev/sleepy-discord/docs/setup-standard/)
 
 ## Make
 > cd build<br>
