@@ -1,6 +1,9 @@
-#include <iostream>
+#include "secrets.h"
+#include "MamadisiBot.h"
 
 int main() {
-    std::cout << "Hello, World!" << std::endl;
-    return 0;
+	MyClientClass client(TOKEN, SleepyDiscord::USER_CONTROLED_THREADS);
+	client.run();
+
+	return 0;
 }
