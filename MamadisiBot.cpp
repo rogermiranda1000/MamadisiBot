@@ -12,11 +12,11 @@ void MamadisiBot::onMessage(SleepyDiscord::Message message) {
 	// sql test
 	MYSQL_ROW row;
 	MYSQL_RES *res = this->sqlPerformQuery("SELECT ID, Nombre FROM Nombres;");
-    while ((row = mysql_fetch_row(res)) != NULL){
+	while ((row = mysql_fetch_row(res)) != NULL){
 		sendMessage(message.channelID, row[0]);
-    }
-    // clean up the database result
-    mysql_free_result(res);
+	}
+	// clean up the database result
+	mysql_free_result(res);
 }
 
 void MamadisiBot::connect(const char *ip, unsigned int port, const char *user, const char *password, const char *database) {
