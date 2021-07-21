@@ -5,8 +5,8 @@ USE MamadisiBot;
 
 DROP TABLE IF EXISTS Admins;
 DROP TABLE IF EXISTS Responses;
-DROP TABLE IF EXISTS Reaction;
-DROP TABLE IF EXISTS Message;
+DROP TABLE IF EXISTS Reactions;
+DROP TABLE IF EXISTS Messages;
 
 CREATE TABLE Admins (
   id BIGINT UNSIGNED NOT NULL, -- user ID (snowflake)
@@ -16,7 +16,7 @@ CREATE TABLE Admins (
 CREATE TABLE Messages (
   id INTEGER NOT NULL AUTO_INCREMENT,
   sended_by BIGINT UNSIGNED, -- user ID (snowflake)
-  message VARCHAR(2000),
+  message TEXT, -- regex of the message
   PRIMARY KEY (id)
 );
 
