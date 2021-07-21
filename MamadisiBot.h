@@ -2,7 +2,6 @@
 
 #include <iostream> // print the error messages
 #include <mariadb/mysql.h>
-#include <regex>
 #include "sleepy_discord/sleepy_discord.h"
 
 class MamadisiBot : public SleepyDiscord::DiscordClient {
@@ -16,5 +15,7 @@ public:
 private:
 	MYSQL *_conn;
 
-	MYSQL_RES *sqlPerformQuery(const char *sql_query);
+	void react(SleepyDiscord::Message message, const char *emoji);
+	void sendMessage(SleepyDiscord::Snowflake<SleepyDiscord::Channel> channel, const char *msg);
+	void sendImage(SleepyDiscord::Snowflake<SleepyDiscord::Channel> channel, const char *msg, const char *img);
 };
