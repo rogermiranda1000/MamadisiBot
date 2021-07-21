@@ -3,6 +3,7 @@
 ## Installation
 - [Sleepy Discord](https://yourwaifu.dev/sleepy-discord/docs/)
 - [Other dependencies](https://yourwaifu.dev/sleepy-discord/docs/setup-standard/)
+- [MariaDB](https://stackoverflow.com/a/64042772/9178470)
 
 ## Make
 > cd build<br>
