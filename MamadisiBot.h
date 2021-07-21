@@ -2,6 +2,7 @@
 
 #include <iostream> // print the error messages
 #include <mariadb/mysql.h>
+#include <regex>
 #include "sleepy_discord/sleepy_discord.h"
 
 class MamadisiBot : public SleepyDiscord::DiscordClient {

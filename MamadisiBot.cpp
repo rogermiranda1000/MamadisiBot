@@ -10,13 +10,16 @@ void MamadisiBot::onMessage(SleepyDiscord::Message message) {
 	else if (message.startsWith("uwu 4")) addReaction(message.channelID, message, "<:mt:808810079536939078"); // mt emoji
 
 	// sql test
-	MYSQL_ROW row;
+	/*MYSQL_ROW row;
 	MYSQL_RES *res = this->sqlPerformQuery("SELECT ID, Nombre FROM Nombres;");
 	while ((row = mysql_fetch_row(res)) != NULL){
 		sendMessage(message.channelID, row[0]);
 	}
 	// clean up the database result
-	mysql_free_result(res);
+	mysql_free_result(res);*/
+
+	std::regex reg("^test\\..");
+	if (regex_match(message.content, reg)) sendMessage(message.channelID, "match");
 }
 
 void MamadisiBot::connect(const char *ip, unsigned int port, const char *user, const char *password, const char *database) {
