@@ -15,7 +15,8 @@ public:
 private:
 	MYSQL *_conn;
 
-	void react(SleepyDiscord::Message message, const char *emoji);
-	void sendMessage(SleepyDiscord::Snowflake<SleepyDiscord::Channel> channel, const char *msg);
-	void sendImage(SleepyDiscord::Snowflake<SleepyDiscord::Channel> channel, const char *msg, const char *img);
+	void searchResponse(uint64_t author, uint64_t server, SleepyDiscord::Message message);
+	void react(SleepyDiscord::Message message, char *emoji);
+	void sendMsg(SleepyDiscord::Snowflake<SleepyDiscord::Channel> channel, char *msg);
+	void sendImage(SleepyDiscord::Snowflake<SleepyDiscord::Channel> channel, char *msg, char *img);
 };

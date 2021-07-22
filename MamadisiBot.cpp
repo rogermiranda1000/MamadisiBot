@@ -1,7 +1,6 @@
 #include "MamadisiBot.h"
 
-// TODO also check server
-static const char PREPARED_STMT_RESPONSE[] = "SELECT Responses.response, Responses.image, Reactions.emoji FROM Messages LEFT JOIN Responses ON Messages.id = Responses.id LEFT JOIN Reactions ON Messages.id = Reactions.id WHERE ? REGEXP Messages.message AND (Messages.sended_by IS NULL OR Messages.sended_by = ?);";
+static const char PREPARED_STMT_RESPONSE[] = "SELECT Responses.response, Responses.image, Reactions.emoji FROM Messages LEFT JOIN Responses ON Messages.id = Responses.id LEFT JOIN Reactions ON Messages.id = Reactions.id WHERE ? REGEXP Messages.message AND (Messages.sended_by IS NULL OR Messages.sended_by = ?) AND (Messages.server IS NULL OR Messages.server = ?)";
 #define PREPARED_STMT_RESPONSE_LEN (sizeof(PREPARED_STMT_RESPONSE)/sizeof(char))
 
 MamadisiBot::~MamadisiBot() {
@@ -13,12 +12,16 @@ MamadisiBot::~MamadisiBot() {
   * If it finds one, it will call react(), sendMessage(), or sendImage()
   */
 void MamadisiBot::onMessage(SleepyDiscord::Message message) {
-	unsigned long long int authorID = 0; // TODO
-	unsigned long long int serverID = message.serverID.number();
-	std::string msg = message.content;
+	if (message.author.bot) return;
+	uint64_t authorID = message.author.ID.number();
+	uint64_t serverID = message.serverID.number();
 
 	std::cout << "New message by " << authorID << " on server " << serverID << std::endl;
 
+	this->searchResponse(authorID, serverID, message);
+}
+
+void MamadisiBot::searchResponse(uint64_t author, uint64_t server, SleepyDiscord::Message message) {
 	MYSQL_STMT *stmt = nullptr;
 
 	stmt = mysql_stmt_init(this->_conn);
@@ -32,47 +35,48 @@ void MamadisiBot::onMessage(SleepyDiscord::Message message) {
 		return; // it makes no sense to continue
 	}
 
-	MYSQL_BIND bind[2];
-	memset(bind, 0, sizeof(MYSQL_BIND) * 2);
+	MYSQL_BIND bind[3];
+	memset(bind, 0, sizeof(MYSQL_BIND) * 3);
 
+	std::string msg = message.content;
 	bind[0].buffer_type = MYSQL_TYPE_STRING;//MYSQL_TYPE_VARCHAR;
 	bind[0].buffer = (char*)msg.c_str();
 	bind[0].buffer_length = msg.length();
 
 	bind[1].buffer_type = MYSQL_TYPE_LONGLONG;
-	bind[1].buffer = &authorID;
-	bind[1].buffer_length = sizeof(authorID);
+	bind[1].buffer = &author;
+	bind[1].buffer_length = sizeof(author);
+
+	bind[2].buffer_type = MYSQL_TYPE_LONGLONG;
+	bind[2].buffer = &server;
+	bind[2].buffer_length = sizeof(server);
 
 	//unsigned int lenght = 1;
 	//mysql_stmt_attr_set(stmt, STMT_ATTR_ARRAY_SIZE, &lenght);
 
 	if (mysql_stmt_bind_param(stmt, bind)) {
 		std::cout << "Prepared statement bind error" << std::endl;
-		mysql_stmt_free_result(stmt);
-		mysql_stmt_close(stmt); // TODO es seguro cerrarlo aquí?
+		mysql_stmt_close(stmt);
 		return; // it makes no sense to continue
 	}
 
 	if (mysql_stmt_execute(stmt)) {
 		std::cout << "Prepared statement error" << mysql_stmt_error(stmt) << std::endl;
-		mysql_stmt_free_result(stmt);
-		mysql_stmt_close(stmt); // TODO es seguro cerrarlo aquí?
+		mysql_stmt_close(stmt);
 		return; // it makes no sense to continue
 	}
 
 	MYSQL_RES *result = mysql_stmt_result_metadata(stmt);
 	if (!result) {
 		std::cout << "Prepared statement error" << mysql_stmt_error(stmt) << std::endl;
-		mysql_stmt_free_result(stmt);
-		mysql_stmt_close(stmt); // TODO es seguro cerrarlo aquí?
+		mysql_stmt_close(stmt);
 		return; // it makes no sense to continue
 	}
 
 	int column_count= mysql_num_fields(result);
 	if (column_count != 3) {
 		std::cout << "Invalid column count returned" << std::endl;
-		mysql_stmt_free_result(stmt);
-		mysql_stmt_close(stmt); // TODO es seguro cerrarlo aquí?
+		mysql_stmt_close(stmt);
 		return;
 	}
 
@@ -94,17 +98,20 @@ void MamadisiBot::onMessage(SleepyDiscord::Message message) {
 
 	if (mysql_stmt_bind_result(stmt, result_bind)) {
 		std::cout << "Prepared statement return error" << mysql_stmt_error(stmt) << std::endl;
-		mysql_stmt_free_result(stmt);
-		mysql_stmt_close(stmt); // TODO es seguro cerrarlo aquí?
+		mysql_stmt_close(stmt);
 		return;
 	}
 
 	while (!mysql_stmt_fetch(stmt)) {
-		std::cout << strResult[0] << std::endl;
+		if (!isNull[2]) this->react(message, strResult[2]);
+
+		if (!isNull[1]) this->sendImage(message.channelID, (isNull[0] ? nullptr : strResult[0]), strResult[1]);
+		else if (!isNull[0]) this->sendMsg(message.channelID, strResult[0]);
+
+		mysql_stmt_free_result(stmt);
 	}
 
 	// free the memory
-	mysql_stmt_free_result(stmt);
 	mysql_stmt_close(stmt);
 
 
@@ -113,19 +120,7 @@ void MamadisiBot::onMessage(SleepyDiscord::Message message) {
 	// other tests
 	/*if (message.startsWith("uwu 1")) sendMessage(message.channelID, "Hello " + message.author.username);
 	else if (message.startsWith("uwu 3")) uploadFile(message.channelID, "/home/rogermiranda1000/MamadisiBotC/img/pufferfish.gif", "");
-	else if (message.startsWith("uwu 4")) addReaction(message.channelID, message, "<:mt:808810079536939078"); // mt emoji
-
-	// sql test
-	MYSQL_ROW row;
-	MYSQL_RES *res = this->sqlPerformQuery("SELECT ID, Nombre FROM Nombres;");
-	while ((row = mysql_fetch_row(res)) != NULL){
-		sendMessage(message.channelID, row[0]);
-	}
-	// clean up the database result
-	mysql_free_result(res);
-
-	std::regex reg("^test\\..");
-	if (regex_match(message.content, reg)) sendMessage(message.channelID, "match");*/
+	else if (message.startsWith("uwu 4")) addReaction(message.channelID, message, "<:mt:808810079536939078");  mt emoji */
 }
 
 void MamadisiBot::connect(const char *ip, unsigned int port, const char *user, const char *password, const char *database) {
@@ -138,15 +133,16 @@ void MamadisiBot::connect(const char *ip, unsigned int port, const char *user, c
 	}
 }
 
-void MamadisiBot::react(SleepyDiscord::Message message, const char *emoji) {
-	addReaction(message.channelID, message, emoji);
+void MamadisiBot::react(SleepyDiscord::Message message, char *emoji) {
+	addReaction(message.channelID, message, std::string(emoji));
 }
 
-void MamadisiBot::sendMessage(SleepyDiscord::Snowflake<SleepyDiscord::Channel> channel, const char *msg) {
-	sendMessage(channel, msg);
+void MamadisiBot::sendMsg(SleepyDiscord::Snowflake<SleepyDiscord::Channel> channel, char *msg) {
+	sendMessage(channel, std::string(msg));
 }
 
-void MamadisiBot::sendImage(SleepyDiscord::Snowflake<SleepyDiscord::Channel> channel, const char *msg, const char *img) {
-	if (msg == nullptr) msg = "";
-	uploadFile(channel, img, msg);
+void MamadisiBot::sendImage(SleepyDiscord::Snowflake<SleepyDiscord::Channel> channel, char *msg, char *img) {
+	std::string msgStr("");
+	if (msg != nullptr) msgStr = std::string(msg);
+	uploadFile(channel, std::string(img), msgStr);
 }
