@@ -46,7 +46,12 @@ void MamadisiBot::onMessage(SleepyDiscord::Message message) {
 	//unsigned int lenght = 1;
 	//mysql_stmt_attr_set(stmt, STMT_ATTR_ARRAY_SIZE, &lenght);
 
-	mysql_stmt_bind_param(stmt, bind);
+	if (mysql_stmt_bind_param(stmt, bind)) {
+		std::cout << "Prepared statement bind error" << std::endl;
+		mysql_stmt_free_result(stmt);
+		mysql_stmt_close(stmt); // TODO es seguro cerrarlo aquí?
+		return; // it makes no sense to continue
+	}
 
 	if (mysql_stmt_execute(stmt)) {
 		std::cout << "Prepared statement error" << mysql_stmt_error(stmt) << std::endl;
@@ -82,7 +87,7 @@ void MamadisiBot::onMessage(SleepyDiscord::Message message) {
 	for (int n = 0; n < 3; n++) {
 		result_bind[n].buffer_type = MYSQL_TYPE_STRING;
 		result_bind[n].buffer = strResult[n];
-		result_bind[n].buffer_length = sizeof(result)/3;
+		result_bind[n].buffer_length = sizeof(strResult)/3;
 		result_bind[n].length = &lenght[n];
 		result_bind[n].is_null = &isNull[n];
 	}
