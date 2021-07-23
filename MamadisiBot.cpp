@@ -34,7 +34,7 @@ void MamadisiBot::onMessage(SleepyDiscord::Message message) {
         size_t match = msg.find(' ', 4);
 
 		const char *response;
-		switch (this->command(msg.substr(4, match-4) /* msg without 'uwu' prefix */, (match != std::string::npos) ? msg.substr(match+1) : std::string() /* arguments */, authorID)) {
+		switch (this->command(serverID, msg.substr(4, match-4) /* msg without 'uwu' prefix */, (match != std::string::npos) ? msg.substr(match+1) : std::string() /* arguments */, authorID)) {
             case EXECUTED:
                 response = "Comando ejecutado! uwu";
                 break;
@@ -56,7 +56,7 @@ void MamadisiBot::onMessage(SleepyDiscord::Message message) {
 }
 
 // TODO
-CMD_RESPONSE MamadisiBot::command(std::string cmd, std::string args, uint64_t user) {
+CMD_RESPONSE MamadisiBot::command(uint64_t server, std::string cmd, std::string args, uint64_t user) {
 	std::cout << "Command '" << cmd << "'" << std::endl;
 	if (cmd == std::string(CMD_HELP)) {
 	    return EXECUTED;
@@ -78,7 +78,7 @@ CMD_RESPONSE MamadisiBot::command(std::string cmd, std::string args, uint64_t us
 
         std::string regexUser = match.str(1), regexMsg = match.str(2), regexAnswer = match.str(3), regexReaction = match.str(4);
         uint64_t desired_user = atoll(regexUser.c_str());
-        if (!addResponse(regexUser.length() > 0 ? &desired_user : nullptr, regexMsg.length() > 0 ? regexMsg.c_str() : nullptr,
+        if (!addResponse(server, regexUser.length() > 0 ? &desired_user : nullptr, regexMsg.length() > 0 ? regexMsg.c_str() : nullptr,
                          regexAnswer.length() > 0 ? regexAnswer.c_str() : nullptr, regexReaction.length() > 0 ? regexReaction.c_str() : nullptr)) return ERROR;
         return EXECUTED;
 	}
@@ -125,15 +125,34 @@ std::set<uint64_t> MamadisiBot::getSuperuser(bool isAdmin) {
 }
 
 // TODO images
-bool MamadisiBot::addResponse(uint64_t *posted_by, const char *post, const char *answer, const char *reaction) {
+bool MamadisiBot::addResponse(uint64_t server, uint64_t *posted_by, const char *post, const char *answer, const char *reaction) {
     if ((posted_by == nullptr && post == nullptr) || (answer == nullptr && reaction == nullptr)) return false;
 
+
+    MYSQL_BIND bind[3];
+    memset(bind, 0, sizeof(MYSQL_BIND) * 3);
+
+    bind[0].buffer_type = MYSQL_TYPE_LONGLONG;
+    bind[0].buffer = &server;
+    bind[0].buffer_length = sizeof(uint64_t);
+
+    char null = STMT_INDICATOR_NULL;
+    bind[1].buffer_type = MYSQL_TYPE_LONGLONG;
+    if (posted_by != nullptr) bind[1].buffer = posted_by;
+    else bind[1].u.indicator = &null;
+    bind[1].buffer_length = sizeof(uint64_t);
+
+    bind[2].buffer_type = MYSQL_TYPE_STRING;
+    if (post != nullptr) bind[2].buffer = (char*)post;
+    else bind[2].u.indicator = &null;
+    bind[2].buffer_length = strlen(post);
 
     /*if (posted_by != nullptr) std::cout << posted_by << std::endl;
     if (post != nullptr) std::cout << post << std::endl;
     if (answer != nullptr) std::cout << answer << std::endl;
     if (reaction != nullptr) std::cout << reaction << std::endl;*/
-    return true;
+    if (!this->runSentence(PREPARED_STMT_INSERT_MESSAGE, bind, nullptr, nullptr)) return false;
+    return true;//this->runSentence(PREPARED_STMT_INSERT_RESPONSE, bind, result_bind, onResponse);
 }
 
 bool MamadisiBot::runSentence(const char *sql, MYSQL_BIND *bind, MYSQL_BIND *result_bind, std::function<void (void)> onResponse) {
@@ -195,7 +214,7 @@ void MamadisiBot::searchResponse(uint64_t author, uint64_t server, std::string m
 	MYSQL_BIND bind[3];
 	memset(bind, 0, sizeof(MYSQL_BIND) * 3);
 
-	bind[0].buffer_type = MYSQL_TYPE_STRING;//MYSQL_TYPE_VARCHAR;
+	bind[0].buffer_type = MYSQL_TYPE_STRING;
 	bind[0].buffer = (char*)msg.c_str();
 	bind[0].buffer_length = msg.length();
 

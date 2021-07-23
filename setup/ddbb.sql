@@ -53,4 +53,4 @@ DROP TRIGGER IF EXISTS addMessage;
 CREATE TRIGGER addMessage
 BEFORE INSERT ON Messages
 FOR EACH ROW
-    INSERT IGNORE INTO Servers(id) VALUE (`server`);
+    INSERT IGNORE INTO Servers(id) VALUE (new.server);
