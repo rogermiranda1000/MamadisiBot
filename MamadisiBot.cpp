@@ -32,10 +32,10 @@ void MamadisiBot::onMessage(SleepyDiscord::Message message) {
 	std::cout << "New message by " << authorID << " on server " << serverID << std::endl;
 
 	if (msg.rfind(CMD " ", 0) == 0) {
-		msg.erase(0, 4); // remove the prefix
+        size_t match = msg.find(' ', 4);
 
 		const char *response;
-		switch (this->command(msg, authorID)) {
+		switch (this->command(msg.substr(4, match-4) /* msg without 'uwu' prefix */, (match != std::string::npos) ? msg.substr(match+1) : std::string() /* arguments */, authorID)) {
             case EXECUTED:
                 response = "Comando ejecutado! uwu";
                 break;
@@ -44,6 +44,9 @@ void MamadisiBot::onMessage(SleepyDiscord::Message message) {
                 break;
             case UNKNOWN:
                 response = "Comando desconocido";
+                break;
+		    case ERROR:
+		        response = "Sintaxis incorrecta";
                 break;
             default:
                 response = "Unknown response code";
@@ -54,7 +57,7 @@ void MamadisiBot::onMessage(SleepyDiscord::Message message) {
 }
 
 // TODO
-CMD_RESPONSE MamadisiBot::command(std::string cmd, uint64_t user) {
+CMD_RESPONSE MamadisiBot::command(std::string cmd, std::string args, uint64_t user) {
 	std::cout << "Command '" << cmd << "'" << std::endl;
 	if (cmd == std::string(CMD_HELP)) {
 	    return EXECUTED;
@@ -65,35 +68,30 @@ CMD_RESPONSE MamadisiBot::command(std::string cmd, uint64_t user) {
         MamadisiBot::rebootServer();
         return EXECUTED;
 	}
+	else if (cmd == std::string(CMD_ADD)) {
+        if (this->_admins.find(user) == this->_admins.end() && this->_writers.find(user) == this->_admins.end()) return NO_PERMISSIONS;
+        //std::cout << "Debug: " << args << std::endl;
+
+        // RegEx parse
+        std::regex rgx(CMD_ADD_SYNTAX);
+        std::smatch match;
+        if (!std::regex_search(args, match, rgx)) return ERROR;
+
+        std::string regexUser = match.str(1), regexMsg = match.str(2), regexAnswer = match.str(3), regexReaction = match.str(4);
+        uint64_t desired_user = atoll(regexUser.c_str());
+        if (!addResponse(regexUser.length() > 0 ? &desired_user : nullptr, regexMsg.length() > 0 ? regexMsg.c_str() : nullptr,
+                         regexAnswer.length() > 0 ? regexAnswer.c_str() : nullptr, regexReaction.length() > 0 ? regexReaction.c_str() : nullptr)) return ERROR;
+        return EXECUTED;
+	}
 	return UNKNOWN;
 }
 
 std::set<uint64_t> MamadisiBot::getAdmins() {
-    std::set<uint64_t> r = this->getSuperuser(true);
-
-    std::cout << "Found admins: ";
-    std::set<uint64_t>::iterator it;
-    for(it = r.begin(); it != r.end(); ++it) {
-        std::cout << *it;
-        std::cout << " ";
-    }
-    std::cout << std::endl;
-
-    return r;
+    return this->getSuperuser(true);
 }
 
 std::set<uint64_t> MamadisiBot::getWriters() {
-    std::set<uint64_t> r = this->getSuperuser(false);
-
-    std::cout << "Found writers: ";
-    std::set<uint64_t>::iterator it;
-    for(it = r.begin(); it != r.end(); ++it) {
-        std::cout << *it;
-        std::cout << " ";
-    }
-    std::cout << std::endl;
-
-    return r;
+    return this->getSuperuser(false);
 }
 
 std::set<uint64_t> MamadisiBot::getSuperuser(bool isAdmin) {
@@ -161,7 +159,29 @@ std::set<uint64_t> MamadisiBot::getSuperuser(bool isAdmin) {
 
     // free the memory
     mysql_stmt_close(stmt);
+
+    if (isAdmin) std::cout << "Found admins: ";
+    else std::cout << "Found writers: ";
+    std::set<uint64_t>::iterator it;
+    for(it = users.begin(); it != users.end(); ++it) {
+        std::cout << *it;
+        std::cout << " ";
+    }
+    std::cout << std::endl;
+
     return users;
+}
+
+// TODO images
+bool MamadisiBot::addResponse(uint64_t *posted_by, const char *post, const char *answer, const char *reaction) {
+    if ((posted_by == nullptr && post == nullptr) || (answer == nullptr && reaction == nullptr)) return false;
+
+    // debug
+    /*if (posted_by != nullptr) std::cout << posted_by << std::endl;
+    if (post != nullptr) std::cout << post << std::endl;
+    if (answer != nullptr) std::cout << answer << std::endl;
+    if (reaction != nullptr) std::cout << reaction << std::endl;*/
+    return true;
 }
 
 void MamadisiBot::searchResponse(uint64_t author, uint64_t server, std::string msg, SleepyDiscord::Message message) {

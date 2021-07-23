@@ -2,6 +2,7 @@
 
 #include <iostream> // print the error messages
 #include <set>
+#include <regex>
 #include <mariadb/mysql.h>
 #include "sleepy_discord/sleepy_discord.h"
 
@@ -11,12 +12,20 @@
 
 #define CMD         "uwu"
 #define CMD_HELP    "help"
+#define CMD_ADD     "add"
+#define CMD_ADD_DELIMITER "\\s*\\|\\s*"
+/**
+ * [@user <id> | ][@text <str> | ] @response <str>
+ * [@user <id> | ][@text <str> | ] @reaction <emoji>
+ */
+#define CMD_ADD_SYNTAX "^(?:@user (?:<@!)?(\\d+)>?" CMD_ADD_DELIMITER ")?(?:@text (.+)" CMD_ADD_DELIMITER ")?(?:(?:@response (.+))|(?:@reaction (.+)))$"
 #define CMD_REBOOT  "reboot"
 
 typedef enum {
     EXECUTED,
     NO_PERMISSIONS,
-    UNKNOWN
+    UNKNOWN,
+    ERROR
 } CMD_RESPONSE;
 
 class MamadisiBot : public SleepyDiscord::DiscordClient {
@@ -34,7 +43,8 @@ private:
 
     static void rebootServer();
 
-    CMD_RESPONSE command(std::string cmd, uint64_t user);
+    CMD_RESPONSE command(std::string cmd, std::string args, uint64_t user);
+    bool addResponse(uint64_t *posted_by, const char *post, const char *answer, const char *reaction);
 	void searchResponse(uint64_t author, uint64_t server, std::string msg, SleepyDiscord::Message message);
     std::set<uint64_t> getAdmins();
     std::set<uint64_t> getWriters();
