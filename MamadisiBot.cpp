@@ -1,15 +1,10 @@
 #include "MamadisiBot.h"
 
 static const char PREPARED_STMT_RESPONSE[] = "SELECT Responses.response, Responses.image, Reactions.emoji FROM Messages LEFT JOIN Responses ON Messages.id = Responses.id LEFT JOIN Reactions ON Messages.id = Reactions.id WHERE ? REGEXP Messages.message AND (Messages.sended_by IS NULL OR Messages.sended_by = ?) AND (Messages.server IS NULL OR Messages.server = ?)";
-#define PREPARED_STMT_RESPONSE_LEN (sizeof(PREPARED_STMT_RESPONSE)/sizeof(char))
 static const char PREPARED_STMT_ADMINS[] = "SELECT id FROM Admins";
-#define PREPARED_STMT_ADMINS_LEN (sizeof(PREPARED_STMT_ADMINS)/sizeof(char))
 static const char PREPARED_STMT_WRITERS[] = "SELECT id FROM Writers";
-#define PREPARED_STMT_WRITERS_LEN (sizeof(PREPARED_STMT_WRITERS)/sizeof(char))
 static const char PREPARED_STMT_INSERT_MESSAGE[] = "INSERT INTO Messages(server, sended_by, message) VALUE (?,?,?)";
-#define PREPARED_STMT_INSERT_MESSAGE_LEN (sizeof(PREPARED_STMT_INSERT_MESSAGE)/sizeof(char))
 static const char PREPARED_STMT_INSERT_RESPONSE[] = "INSERT INTO Responses(id, response, image) VALUE (LAST_INSERT_ID(),?,NULL)"; // TODO img
-#define PREPARED_STMT_INSERT_RESPONSE_LEN (sizeof(PREPARED_STMT_INSERT_RESPONSE)/sizeof(char))
 
 
 MamadisiBot::~MamadisiBot() {
@@ -197,19 +192,6 @@ bool MamadisiBot::runSentence(const char *sql, MYSQL_BIND *bind, MYSQL_BIND *res
 }
 
 void MamadisiBot::searchResponse(uint64_t author, uint64_t server, std::string msg, SleepyDiscord::Message message) {
-	MYSQL_STMT *stmt = nullptr;
-
-	stmt = mysql_stmt_init(this->_conn);
-	if (stmt == nullptr) {
-		std::cout << "Init prepared statement error" << std::endl;
-		return; // it makes no sense to continue
-	}
-
-	if (mysql_stmt_prepare(stmt, PREPARED_STMT_RESPONSE, PREPARED_STMT_RESPONSE_LEN) != 0) {
-		std::cout << "Init prepared statement error" << mysql_stmt_error(stmt) << std::endl;
-		return; // it makes no sense to continue
-	}
-
 	MYSQL_BIND bind[3];
 	memset(bind, 0, sizeof(MYSQL_BIND) * 3);
 
@@ -224,35 +206,6 @@ void MamadisiBot::searchResponse(uint64_t author, uint64_t server, std::string m
 	bind[2].buffer_type = MYSQL_TYPE_LONGLONG;
 	bind[2].buffer = &server;
 	bind[2].buffer_length = sizeof(server);
-
-	//unsigned int lenght = 1;
-	//mysql_stmt_attr_set(stmt, STMT_ATTR_ARRAY_SIZE, &lenght);
-
-	if (mysql_stmt_bind_param(stmt, bind)) {
-		std::cout << "Prepared statement bind error" << std::endl;
-		mysql_stmt_close(stmt);
-		return; // it makes no sense to continue
-	}
-
-	if (mysql_stmt_execute(stmt)) {
-		std::cout << "Prepared statement error" << mysql_stmt_error(stmt) << std::endl;
-		mysql_stmt_close(stmt);
-		return; // it makes no sense to continue
-	}
-
-	MYSQL_RES *result = mysql_stmt_result_metadata(stmt);
-	if (!result) {
-		std::cout << "Prepared statement error" << mysql_stmt_error(stmt) << std::endl;
-		mysql_stmt_close(stmt);
-		return; // it makes no sense to continue
-	}
-
-	int column_count= mysql_num_fields(result);
-	if (column_count != 3) {
-		std::cout << "Invalid column count returned" << std::endl;
-		mysql_stmt_close(stmt);
-		return;
-	}
 
 	// get the result
 	MYSQL_BIND result_bind[3];
@@ -270,24 +223,15 @@ void MamadisiBot::searchResponse(uint64_t author, uint64_t server, std::string m
 		result_bind[n].is_null = &isNull[n];
 	}
 
-	if (mysql_stmt_bind_result(stmt, result_bind)) {
-		std::cout << "Prepared statement return error" << mysql_stmt_error(stmt) << std::endl;
-		mysql_stmt_close(stmt);
-		return;
-	}
-
-	while (!mysql_stmt_fetch(stmt)) {
+    auto onResponse = [&]() {
 		std::cout << "Response found" << std::endl;
 		if (!isNull[2]) this->react(message, strResult[2]);
 
 		if (!isNull[1]) this->sendImage(message.channelID, (isNull[0] ? nullptr : strResult[0]), strResult[1]);
 		else if (!isNull[0]) this->sendMsg(message.channelID, strResult[0]);
+	};
 
-		mysql_stmt_free_result(stmt);
-	}
-
-	// free the memory
-	mysql_stmt_close(stmt);
+    this->runSentence(PREPARED_STMT_RESPONSE, bind, result_bind, onResponse);
 
 
 
