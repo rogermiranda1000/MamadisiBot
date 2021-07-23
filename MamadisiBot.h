@@ -5,6 +5,7 @@
 #include <regex>
 #include <mariadb/mysql.h>
 #include "sleepy_discord/sleepy_discord.h"
+#include <functional> // function parameters
 
 // reboot includes
 #include <unistd.h>
@@ -43,6 +44,7 @@ private:
 
     static void rebootServer();
 
+    bool runSentence(const char *sql, MYSQL_BIND *bind = nullptr, MYSQL_BIND *result_bind = nullptr, std::function<void (void)> onResponse = nullptr);
     CMD_RESPONSE command(std::string cmd, std::string args, uint64_t user);
     bool addResponse(uint64_t *posted_by, const char *post, const char *answer, const char *reaction);
 	void searchResponse(uint64_t author, uint64_t server, std::string msg, SleepyDiscord::Message message);

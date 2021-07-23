@@ -36,7 +36,7 @@ CREATE TABLE Messages (
 
 CREATE TABLE Responses (
   id INTEGER NOT NULL,
-  response VARCHAR(2000),
+  response TEXT,
   image VARCHAR(255), -- if contains http:// or https:// it's remote; if not local
   PRIMARY KEY (id),
   FOREIGN KEY (id) REFERENCES Messages(id)
@@ -48,3 +48,9 @@ CREATE TABLE Reactions (
   PRIMARY KEY (id),
   FOREIGN KEY (id) REFERENCES Messages(id)
 );
+
+DROP TRIGGER IF EXISTS addMessage;
+CREATE TRIGGER addMessage
+BEFORE INSERT ON Messages
+FOR EACH ROW
+    INSERT IGNORE INTO Servers(id) VALUE (`server`);

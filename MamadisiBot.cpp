@@ -6,6 +6,10 @@ static const char PREPARED_STMT_ADMINS[] = "SELECT id FROM Admins";
 #define PREPARED_STMT_ADMINS_LEN (sizeof(PREPARED_STMT_ADMINS)/sizeof(char))
 static const char PREPARED_STMT_WRITERS[] = "SELECT id FROM Writers";
 #define PREPARED_STMT_WRITERS_LEN (sizeof(PREPARED_STMT_WRITERS)/sizeof(char))
+static const char PREPARED_STMT_INSERT_MESSAGE[] = "INSERT INTO Messages(server, sended_by, message) VALUE (?,?,?)";
+#define PREPARED_STMT_INSERT_MESSAGE_LEN (sizeof(PREPARED_STMT_INSERT_MESSAGE)/sizeof(char))
+static const char PREPARED_STMT_INSERT_RESPONSE[] = "INSERT INTO Responses(id, response, image) VALUE (LAST_INSERT_ID(),?,NULL)"; // TODO img
+#define PREPARED_STMT_INSERT_RESPONSE_LEN (sizeof(PREPARED_STMT_INSERT_RESPONSE)/sizeof(char))
 
 
 MamadisiBot::~MamadisiBot() {
@@ -96,44 +100,6 @@ std::set<uint64_t> MamadisiBot::getWriters() {
 
 std::set<uint64_t> MamadisiBot::getSuperuser(bool isAdmin) {
     std::set<uint64_t> users;
-    MYSQL_STMT *stmt = nullptr;
-
-    stmt = mysql_stmt_init(this->_conn);
-    if (stmt == nullptr) {
-        std::cout << "Init prepared statement error" << std::endl;
-        return users;
-    }
-
-    if (mysql_stmt_prepare(stmt, isAdmin ? PREPARED_STMT_ADMINS : PREPARED_STMT_WRITERS, isAdmin ? PREPARED_STMT_ADMINS_LEN : PREPARED_STMT_WRITERS_LEN) != 0) {
-        std::cout << "Init prepared statement error" << mysql_stmt_error(stmt) << std::endl;
-        return users;
-    }
-
-    /*if (mysql_stmt_bind_param(stmt, bind)) {
-        std::cout << "Prepared statement bind error" << std::endl;
-        mysql_stmt_close(stmt);
-        return; // it makes no sense to continue
-    }*/
-
-    if (mysql_stmt_execute(stmt)) {
-        std::cout << "Prepared statement error" << mysql_stmt_error(stmt) << std::endl;
-        mysql_stmt_close(stmt);
-        return users;
-    }
-
-    MYSQL_RES *result = mysql_stmt_result_metadata(stmt);
-    if (!result) {
-        std::cout << "Prepared statement error" << mysql_stmt_error(stmt) << std::endl;
-        mysql_stmt_close(stmt);
-        return users;
-    }
-
-    int column_count= mysql_num_fields(result);
-    if (column_count != 1) {
-        std::cout << "Invalid column count returned" << std::endl;
-        mysql_stmt_close(stmt);
-        return users;
-    }
 
     // get the result
     MYSQL_BIND result_bind[1];
@@ -145,20 +111,11 @@ std::set<uint64_t> MamadisiBot::getSuperuser(bool isAdmin) {
     result_bind[0].buffer = &userId;
     result_bind[0].buffer_length = sizeof(userId);
 
-    if (mysql_stmt_bind_result(stmt, result_bind)) {
-        std::cout << "Prepared statement return error" << mysql_stmt_error(stmt) << std::endl;
-        mysql_stmt_close(stmt);
-        return users;
-    }
-
-    while (!mysql_stmt_fetch(stmt)) {
+    auto onResponse = [&]() {
         users.insert(userId);
+    };
 
-        mysql_stmt_free_result(stmt);
-    }
-
-    // free the memory
-    mysql_stmt_close(stmt);
+    if (!this->runSentence(isAdmin ? PREPARED_STMT_ADMINS : PREPARED_STMT_WRITERS, nullptr, result_bind, onResponse)) return users; // error
 
     if (isAdmin) std::cout << "Found admins: ";
     else std::cout << "Found writers: ";
@@ -176,11 +133,66 @@ std::set<uint64_t> MamadisiBot::getSuperuser(bool isAdmin) {
 bool MamadisiBot::addResponse(uint64_t *posted_by, const char *post, const char *answer, const char *reaction) {
     if ((posted_by == nullptr && post == nullptr) || (answer == nullptr && reaction == nullptr)) return false;
 
-    // debug
+
     /*if (posted_by != nullptr) std::cout << posted_by << std::endl;
     if (post != nullptr) std::cout << post << std::endl;
     if (answer != nullptr) std::cout << answer << std::endl;
     if (reaction != nullptr) std::cout << reaction << std::endl;*/
+    return true;
+}
+
+bool MamadisiBot::runSentence(const char *sql, MYSQL_BIND *bind, MYSQL_BIND *result_bind, std::function<void (void)> onResponse) {
+    MYSQL_STMT *stmt = nullptr;
+
+    stmt = mysql_stmt_init(this->_conn);
+    if (stmt == nullptr) {
+        std::cout << "Init prepared statement error" << std::endl;
+        return false; // it makes no sense to continue
+    }
+
+    if (mysql_stmt_prepare(stmt, sql, strlen(sql)) != 0) {
+        std::cout << "Init prepared statement error" << mysql_stmt_error(stmt) << std::endl;
+        return false; // it makes no sense to continue
+    }
+
+    if (bind != nullptr) {
+        if (mysql_stmt_bind_param(stmt, bind)) {
+            std::cout << "Prepared statement bind error" << std::endl;
+            mysql_stmt_close(stmt);
+            return false; // it makes no sense to continue
+        }
+    }
+
+    if (mysql_stmt_execute(stmt)) {
+        std::cout << "Prepared statement error" << mysql_stmt_error(stmt) << std::endl;
+        mysql_stmt_close(stmt);
+        return false; // it makes no sense to continue
+    }
+
+    if (result_bind != nullptr) {
+        MYSQL_RES *result = mysql_stmt_result_metadata(stmt);
+        if (!result) {
+            std::cout << "Prepared statement error" << mysql_stmt_error(stmt) << std::endl;
+            mysql_stmt_close(stmt);
+            return false; // it makes no sense to continue
+        }
+
+        if (mysql_stmt_bind_result(stmt, result_bind)) {
+            std::cout << "Prepared statement return error" << mysql_stmt_error(stmt) << std::endl;
+            mysql_stmt_close(stmt);
+            return false;
+        }
+
+        while (!mysql_stmt_fetch(stmt)) {
+            onResponse();
+
+            mysql_stmt_free_result(stmt);
+        }
+    }
+
+    // free the memory
+    mysql_stmt_close(stmt);
+
     return true;
 }
 
