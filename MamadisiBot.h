@@ -44,6 +44,7 @@ private:
     std::set<uint64_t> _writers;
 
     static void rebootServer();
+    static std::string parseRegex(std::string str);
 
     bool runSentence(const char *sql, MYSQL_BIND *bind = nullptr, MYSQL_BIND *result_bind = nullptr, std::function<void (void)> onResponse = nullptr);
     CMD_RESPONSE command(uint64_t server, std::string cmd, std::string args, uint64_t user);

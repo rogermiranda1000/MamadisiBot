@@ -78,11 +78,7 @@ CMD_RESPONSE MamadisiBot::command(uint64_t server, std::string cmd, std::string 
 
         std::string regexUser = match.str(1), regexMsg = match.str(2), regexAnswer = match.str(3), regexReaction = match.str(4);
         uint64_t desired_user = atoll(regexUser.c_str());
-        if (regexMsg.length() > 0 && cmd == std::string(CMD_ADD_LITERAL)) {
-            // literal -> begin + msg + end
-            regexMsg.insert(0,1,'^');
-            regexMsg += '$';
-        }
+        if (regexMsg.length() > 0 && cmd == std::string(CMD_ADD_LITERAL)) regexMsg = "^" + MamadisiBot::parseRegex(regexMsg) + "$"; // literal -> begin + msg + end
         if (!this->addResponse(server, regexUser.length() > 0 ? &desired_user : nullptr, regexMsg.length() > 0 ? regexMsg.c_str() : nullptr,
                          regexAnswer.length() > 0 ? regexAnswer.c_str() : nullptr, regexReaction.length() > 0 ? regexReaction.c_str() : nullptr)) return ERROR;
         return EXECUTED;
@@ -304,4 +300,19 @@ void MamadisiBot::sendImage(SleepyDiscord::Snowflake<SleepyDiscord::Channel> cha
 	std::string msgStr("");
 	if (msg != nullptr) msgStr = std::string(msg);
     this->uploadFile(channel, std::string(img), msgStr);
+}
+
+std::string MamadisiBot::parseRegex(std::string str) {
+    std::string cpy = std::regex_replace( str, std::regex("\\\\"), "\\\\");
+    cpy = std::regex_replace( cpy, std::regex("\\("), "\\(");
+    cpy = std::regex_replace( cpy, std::regex("\\)"), "\\)");
+    cpy = std::regex_replace( cpy, std::regex("\\."), "\\.");
+    cpy = std::regex_replace( cpy, std::regex("\\{"), "\\{");
+    cpy = std::regex_replace( cpy, std::regex("\\}"), "\\}");
+    cpy = std::regex_replace( cpy, std::regex("\\*"), "\\*");
+    cpy = std::regex_replace( cpy, std::regex("\\+"), "\\+");
+    cpy = std::regex_replace( cpy, std::regex("\\?"), "\\?");
+    cpy = std::regex_replace( cpy, std::regex("\\|"), "\\|");
+    cpy = std::regex_replace( cpy, std::regex("\\["), "\\[");
+    return std::regex_replace( cpy, std::regex("\\]"), "\\]");
 }
