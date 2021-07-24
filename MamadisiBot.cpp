@@ -23,7 +23,7 @@ void MamadisiBot::rebootServer() {
   * If it finds one, it will call react(), sendMessage(), or sendImage()
   */
 void MamadisiBot::onMessage(SleepyDiscord::Message message) {
-	if (message.author.bot) return;
+	if (message.author.bot || message.serverID.empty()) return;
 	uint64_t authorID = message.author.ID.number();
 	uint64_t serverID = message.serverID.number();
 	std::string msg = message.content;
@@ -67,7 +67,7 @@ CMD_RESPONSE MamadisiBot::command(uint64_t server, std::string cmd, std::string 
         MamadisiBot::rebootServer();
         return EXECUTED;
 	}
-	else if (cmd == std::string(CMD_ADD)) {
+	else if (cmd == std::string(CMD_ADD) || cmd == std::string(CMD_ADD_LITERAL)) {
         if (this->_admins.find(user) == this->_admins.end() && this->_writers.find(user) == this->_admins.end()) return NO_PERMISSIONS;
         //std::cout << "Debug: " << args << std::endl;
 
@@ -78,7 +78,8 @@ CMD_RESPONSE MamadisiBot::command(uint64_t server, std::string cmd, std::string 
 
         std::string regexUser = match.str(1), regexMsg = match.str(2), regexAnswer = match.str(3), regexReaction = match.str(4);
         uint64_t desired_user = atoll(regexUser.c_str());
-        if (!addResponse(server, regexUser.length() > 0 ? &desired_user : nullptr, regexMsg.length() > 0 ? regexMsg.c_str() : nullptr,
+        if (regexMsg.length() > 0 && cmd == std::string(CMD_ADD_LITERAL)) regexMsg = "^" + MamadisiBot::parseRegex(regexMsg) + "$"; // literal -> begin + msg + end
+        if (!this->addResponse(server, regexUser.length() > 0 ? &desired_user : nullptr, regexMsg.length() > 0 ? regexMsg.c_str() : nullptr,
                          regexAnswer.length() > 0 ? regexAnswer.c_str() : nullptr, regexReaction.length() > 0 ? regexReaction.c_str() : nullptr)) return ERROR;
         return EXECUTED;
 	}
@@ -126,12 +127,12 @@ std::set<uint64_t> MamadisiBot::getSuperuser(bool isAdmin) {
 
 // TODO images
 bool MamadisiBot::addResponse(uint64_t server, uint64_t *posted_by, const char *post, const char *answer, const char *reaction) {
-    if ((posted_by == nullptr && post == nullptr) || !((answer == nullptr) ^ (reaction == nullptr))) return false;
+    if (post == nullptr || !((answer == nullptr) ^ (reaction == nullptr))) return false;
 
-    //if (posted_by != nullptr) std::cout << posted_by << std::endl;
+    /*if (posted_by != nullptr) std::cout << posted_by << std::endl;
     if (post != nullptr) std::cout << "On '" << post << "'" << std::endl;
     if (answer != nullptr) std::cout << "Reply '" << answer << "'" << std::endl;
-    //if (reaction != nullptr) std::cout << reaction << std::endl;
+    if (reaction != nullptr) std::cout << reaction << std::endl;*/
 
     MYSQL_BIND *bind = (MYSQL_BIND*)malloc(sizeof(MYSQL_BIND)*3);
     memset(bind, 0, sizeof(MYSQL_BIND) * 3);
@@ -204,13 +205,6 @@ bool MamadisiBot::runSentence(const char *sql, MYSQL_BIND *bind, MYSQL_BIND *res
     }
 
     if (result_bind != nullptr) {
-        MYSQL_RES *result = mysql_stmt_result_metadata(stmt);
-        if (!result) {
-            std::cout << "Prepared statement error" << mysql_stmt_error(stmt) << std::endl;
-            mysql_stmt_close(stmt);
-            return false; // it makes no sense to continue
-        }
-
         if (mysql_stmt_bind_result(stmt, result_bind)) {
             std::cout << "Prepared statement return error" << mysql_stmt_error(stmt) << std::endl;
             mysql_stmt_close(stmt);
@@ -306,4 +300,19 @@ void MamadisiBot::sendImage(SleepyDiscord::Snowflake<SleepyDiscord::Channel> cha
 	std::string msgStr("");
 	if (msg != nullptr) msgStr = std::string(msg);
     this->uploadFile(channel, std::string(img), msgStr);
+}
+
+std::string MamadisiBot::parseRegex(std::string str) {
+    std::string cpy = std::regex_replace( str, std::regex("\\\\"), "\\\\");
+    cpy = std::regex_replace( cpy, std::regex("\\("), "\\(");
+    cpy = std::regex_replace( cpy, std::regex("\\)"), "\\)");
+    cpy = std::regex_replace( cpy, std::regex("\\."), "\\.");
+    cpy = std::regex_replace( cpy, std::regex("\\{"), "\\{");
+    cpy = std::regex_replace( cpy, std::regex("\\}"), "\\}");
+    cpy = std::regex_replace( cpy, std::regex("\\*"), "\\*");
+    cpy = std::regex_replace( cpy, std::regex("\\+"), "\\+");
+    cpy = std::regex_replace( cpy, std::regex("\\?"), "\\?");
+    cpy = std::regex_replace( cpy, std::regex("\\|"), "\\|");
+    cpy = std::regex_replace( cpy, std::regex("\\["), "\\[");
+    return std::regex_replace( cpy, std::regex("\\]"), "\\]");
 }
