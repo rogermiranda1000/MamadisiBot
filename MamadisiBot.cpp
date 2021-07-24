@@ -126,10 +126,14 @@ std::set<uint64_t> MamadisiBot::getSuperuser(bool isAdmin) {
 
 // TODO images
 bool MamadisiBot::addResponse(uint64_t server, uint64_t *posted_by, const char *post, const char *answer, const char *reaction) {
-    if ((posted_by == nullptr && post == nullptr) || (answer == nullptr && reaction == nullptr)) return false;
+    if ((posted_by == nullptr && post == nullptr) || !((answer == nullptr) ^ (reaction == nullptr))) return false;
 
+    //if (posted_by != nullptr) std::cout << posted_by << std::endl;
+    if (post != nullptr) std::cout << "On '" << post << "'" << std::endl;
+    if (answer != nullptr) std::cout << "Reply '" << answer << "'" << std::endl;
+    //if (reaction != nullptr) std::cout << reaction << std::endl;
 
-    MYSQL_BIND bind[3];
+    MYSQL_BIND *bind = (MYSQL_BIND*)malloc(sizeof(MYSQL_BIND)*3);
     memset(bind, 0, sizeof(MYSQL_BIND) * 3);
 
     bind[0].buffer_type = MYSQL_TYPE_LONGLONG;
@@ -147,12 +151,28 @@ bool MamadisiBot::addResponse(uint64_t server, uint64_t *posted_by, const char *
     else bind[2].u.indicator = &null;
     bind[2].buffer_length = strlen(post);
 
-    /*if (posted_by != nullptr) std::cout << posted_by << std::endl;
-    if (post != nullptr) std::cout << post << std::endl;
-    if (answer != nullptr) std::cout << answer << std::endl;
-    if (reaction != nullptr) std::cout << reaction << std::endl;*/
-    if (!this->runSentence(PREPARED_STMT_INSERT_MESSAGE, bind, nullptr, nullptr)) return false;
-    return true;//this->runSentence(PREPARED_STMT_INSERT_RESPONSE, bind, result_bind, onResponse);
+    if (!this->runSentence(PREPARED_STMT_INSERT_MESSAGE, bind, nullptr, nullptr)) {
+        free(bind);
+        return false;
+    }
+
+    free(bind);
+    if (answer != nullptr) {
+        bind = (MYSQL_BIND*)malloc(sizeof(MYSQL_BIND)*1);
+        memset(bind, 0, sizeof(MYSQL_BIND) * 1);
+
+        bind[0].buffer_type = MYSQL_TYPE_STRING;
+        bind[0].buffer = (char*)answer;
+        bind[0].buffer_length = strlen(answer);
+
+        bool r = this->runSentence(PREPARED_STMT_INSERT_RESPONSE, bind, nullptr, nullptr);
+        free(bind);
+        return r;
+    }
+    else {
+        // TODO
+        return false; // this->runSentence(PREPARED_STMT_INSERT_RESPONSE, bind2, nullptr, nullptr);
+    }
 }
 
 bool MamadisiBot::runSentence(const char *sql, MYSQL_BIND *bind, MYSQL_BIND *result_bind, std::function<void (void)> onResponse) {

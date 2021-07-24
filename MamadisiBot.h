@@ -14,7 +14,7 @@
 #define CMD         "uwu"
 #define CMD_HELP    "help"
 #define CMD_ADD     "add"
-#define CMD_ADD_DELIMITER "\\s*\\|\\s*"
+#define CMD_ADD_DELIMITER "\\s\\|\\s"
 /**
  * [@user <id> | ][@text <str> | ] @response <str>
  * [@user <id> | ][@text <str> | ] @reaction <emoji>
