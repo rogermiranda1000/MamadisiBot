@@ -11,13 +11,14 @@
 #include <unistd.h>
 #include <sys/reboot.h>
 
-#define CMD         "uwu"
-#define CMD_HELP    "help"
-#define CMD_ADD     "add"
+#define CMD             "uwu"
+#define CMD_HELP        "help"
+#define CMD_ADD         "add"
+#define CMD_ADD_LITERAL "add_literal"
 #define CMD_ADD_DELIMITER "\\s\\|\\s"
 /**
- * [@user <id> | ][@text <str> | ] @response <str>
- * [@user <id> | ][@text <str> | ] @reaction <emoji>
+ * [@user <id> | ]@text <str> | @response <str>
+ * [@user <id> | ]@text <str> | @reaction <emoji>
  */
 #define CMD_ADD_SYNTAX "^(?:@user (?:<@!)?(\\d+)>?" CMD_ADD_DELIMITER ")?(?:@text (.+)" CMD_ADD_DELIMITER ")?(?:(?:@response (.+))|(?:@reaction (.+)))$"
 #define CMD_REBOOT  "reboot"

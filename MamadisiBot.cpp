@@ -67,7 +67,7 @@ CMD_RESPONSE MamadisiBot::command(uint64_t server, std::string cmd, std::string 
         MamadisiBot::rebootServer();
         return EXECUTED;
 	}
-	else if (cmd == std::string(CMD_ADD)) {
+	else if (cmd == std::string(CMD_ADD) || cmd == std::string(CMD_ADD_LITERAL)) {
         if (this->_admins.find(user) == this->_admins.end() && this->_writers.find(user) == this->_admins.end()) return NO_PERMISSIONS;
         //std::cout << "Debug: " << args << std::endl;
 
@@ -78,7 +78,12 @@ CMD_RESPONSE MamadisiBot::command(uint64_t server, std::string cmd, std::string 
 
         std::string regexUser = match.str(1), regexMsg = match.str(2), regexAnswer = match.str(3), regexReaction = match.str(4);
         uint64_t desired_user = atoll(regexUser.c_str());
-        if (!addResponse(server, regexUser.length() > 0 ? &desired_user : nullptr, regexMsg.length() > 0 ? regexMsg.c_str() : nullptr,
+        if (regexMsg.length() > 0 && cmd == std::string(CMD_ADD_LITERAL)) {
+            // literal -> begin + msg + end
+            regexMsg.insert(0,1,'^');
+            regexMsg += '$';
+        }
+        if (!this->addResponse(server, regexUser.length() > 0 ? &desired_user : nullptr, regexMsg.length() > 0 ? regexMsg.c_str() : nullptr,
                          regexAnswer.length() > 0 ? regexAnswer.c_str() : nullptr, regexReaction.length() > 0 ? regexReaction.c_str() : nullptr)) return ERROR;
         return EXECUTED;
 	}
@@ -126,12 +131,12 @@ std::set<uint64_t> MamadisiBot::getSuperuser(bool isAdmin) {
 
 // TODO images
 bool MamadisiBot::addResponse(uint64_t server, uint64_t *posted_by, const char *post, const char *answer, const char *reaction) {
-    if ((posted_by == nullptr && post == nullptr) || !((answer == nullptr) ^ (reaction == nullptr))) return false;
+    if (post == nullptr || !((answer == nullptr) ^ (reaction == nullptr))) return false;
 
-    //if (posted_by != nullptr) std::cout << posted_by << std::endl;
+    /*if (posted_by != nullptr) std::cout << posted_by << std::endl;
     if (post != nullptr) std::cout << "On '" << post << "'" << std::endl;
     if (answer != nullptr) std::cout << "Reply '" << answer << "'" << std::endl;
-    //if (reaction != nullptr) std::cout << reaction << std::endl;
+    if (reaction != nullptr) std::cout << reaction << std::endl;*/
 
     MYSQL_BIND *bind = (MYSQL_BIND*)malloc(sizeof(MYSQL_BIND)*3);
     memset(bind, 0, sizeof(MYSQL_BIND) * 3);
