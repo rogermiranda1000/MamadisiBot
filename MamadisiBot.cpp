@@ -209,13 +209,6 @@ bool MamadisiBot::runSentence(const char *sql, MYSQL_BIND *bind, MYSQL_BIND *res
     }
 
     if (result_bind != nullptr) {
-        MYSQL_RES *result = mysql_stmt_result_metadata(stmt);
-        if (!result) {
-            std::cout << "Prepared statement error" << mysql_stmt_error(stmt) << std::endl;
-            mysql_stmt_close(stmt);
-            return false; // it makes no sense to continue
-        }
-
         if (mysql_stmt_bind_result(stmt, result_bind)) {
             std::cout << "Prepared statement return error" << mysql_stmt_error(stmt) << std::endl;
             mysql_stmt_close(stmt);
