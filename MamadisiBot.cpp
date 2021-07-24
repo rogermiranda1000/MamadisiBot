@@ -23,7 +23,7 @@ void MamadisiBot::rebootServer() {
   * If it finds one, it will call react(), sendMessage(), or sendImage()
   */
 void MamadisiBot::onMessage(SleepyDiscord::Message message) {
-	if (message.author.bot) return;
+	if (message.author.bot || message.serverID.empty()) return;
 	uint64_t authorID = message.author.ID.number();
 	uint64_t serverID = message.serverID.number();
 	std::string msg = message.content;
