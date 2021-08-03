@@ -1,10 +1,13 @@
 #include "MamadisiBot.h"
 
+#define DISCORD_EMOJI "^<:.+:\\d+>$"
+
 static const char PREPARED_STMT_RESPONSE[] = "SELECT Responses.response, Responses.image, Reactions.emoji FROM Messages LEFT JOIN Responses ON Messages.id = Responses.id LEFT JOIN Reactions ON Messages.id = Reactions.id WHERE ? REGEXP Messages.message AND (Messages.sended_by IS NULL OR Messages.sended_by = ?) AND (Messages.server IS NULL OR Messages.server = ?)";
 static const char PREPARED_STMT_ADMINS[] = "SELECT id FROM Admins";
 static const char PREPARED_STMT_WRITERS[] = "SELECT id FROM Writers";
 static const char PREPARED_STMT_INSERT_MESSAGE[] = "INSERT INTO Messages(server, sended_by, message) VALUE (?,?,?)";
 static const char PREPARED_STMT_INSERT_RESPONSE[] = "INSERT INTO Responses(id, response, image) VALUE (LAST_INSERT_ID(),?,NULL)"; // TODO img
+static const char PREPARED_STMT_INSERT_REACTION[] = "INSERT INTO Reactions(id, emoji) VALUE (LAST_INSERT_ID(),?)";
 
 
 MamadisiBot::~MamadisiBot() {
@@ -69,7 +72,6 @@ CMD_RESPONSE MamadisiBot::command(uint64_t server, std::string cmd, std::string 
 	}
 	else if (cmd == std::string(CMD_ADD) || cmd == std::string(CMD_ADD_LITERAL)) {
         if (this->_admins.find(user) == this->_admins.end() && this->_writers.find(user) == this->_admins.end()) return NO_PERMISSIONS;
-        //std::cout << "Debug: " << args << std::endl;
 
         // RegEx parse
         std::regex rgx(CMD_ADD_SYNTAX);
@@ -78,9 +80,12 @@ CMD_RESPONSE MamadisiBot::command(uint64_t server, std::string cmd, std::string 
 
         std::string regexUser = match.str(1), regexMsg = match.str(2), regexAnswer = match.str(3), regexReaction = match.str(4);
         uint64_t desired_user = atoll(regexUser.c_str());
-        if (regexMsg.length() > 0 && cmd == std::string(CMD_ADD_LITERAL)) regexMsg = "^" + MamadisiBot::parseRegex(regexMsg) + "$"; // literal -> begin + msg + end
+		
+		// literal -> begin + msg + end
+        if (regexMsg.length() > 0 && cmd == std::string(CMD_ADD_LITERAL)) regexMsg = "^" + MamadisiBot::parseRegex(regexMsg) + "$";
+		
         if (!this->addResponse(server, regexUser.length() > 0 ? &desired_user : nullptr, regexMsg.length() > 0 ? regexMsg.c_str() : nullptr,
-                         regexAnswer.length() > 0 ? regexAnswer.c_str() : nullptr, regexReaction.length() > 0 ? regexReaction.c_str() : nullptr)) return ERROR;
+                         regexAnswer.length() > 0 ? regexAnswer.c_str() : nullptr, regexReaction.length() > 0 ? &regexReaction : nullptr)) return ERROR;
         return EXECUTED;
 	}
 	return UNKNOWN;
@@ -126,13 +131,16 @@ std::set<uint64_t> MamadisiBot::getSuperuser(bool isAdmin) {
 }
 
 // TODO images
-bool MamadisiBot::addResponse(uint64_t server, uint64_t *posted_by, const char *post, const char *answer, const char *reaction) {
+bool MamadisiBot::addResponse(uint64_t server, uint64_t *posted_by, const char *post, const char *answer, std::string *reaction) {
     if (post == nullptr || !((answer == nullptr) ^ (reaction == nullptr))) return false;
-
-    /*if (posted_by != nullptr) std::cout << posted_by << std::endl;
-    if (post != nullptr) std::cout << "On '" << post << "'" << std::endl;
-    if (answer != nullptr) std::cout << "Reply '" << answer << "'" << std::endl;
-    if (reaction != nullptr) std::cout << reaction << std::endl;*/
+	
+	// check if 'post' is a valid regex
+	try {
+        std::regex tmp(post);
+    }
+    catch (const std::regex_error& e) {
+        return false;
+    }
 
     MYSQL_BIND *bind = (MYSQL_BIND*)malloc(sizeof(MYSQL_BIND)*3);
     memset(bind, 0, sizeof(MYSQL_BIND) * 3);
@@ -171,8 +179,19 @@ bool MamadisiBot::addResponse(uint64_t server, uint64_t *posted_by, const char *
         return r;
     }
     else {
-        // TODO
-        return false; // this->runSentence(PREPARED_STMT_INSERT_RESPONSE, bind2, nullptr, nullptr);
+        // reaction
+        bind = (MYSQL_BIND*)malloc(sizeof(MYSQL_BIND)*1);
+        memset(bind, 0, sizeof(MYSQL_BIND) * 1);
+
+		if (std::regex_match(*reaction, std::regex(DISCORD_EMOJI))) reaction->pop_back(); // discord emoji -> remove last '>'
+
+        bind[0].buffer_type = MYSQL_TYPE_STRING;
+        bind[0].buffer = (char*)reaction->c_str();
+        bind[0].buffer_length = reaction->length();
+		
+        bool r = this->runSentence(PREPARED_STMT_INSERT_REACTION, bind, nullptr, nullptr);
+        free(bind);
+        return r;
     }
 }
 
@@ -211,15 +230,16 @@ bool MamadisiBot::runSentence(const char *sql, MYSQL_BIND *bind, MYSQL_BIND *res
             return false;
         }
 
-        while (!mysql_stmt_fetch(stmt)) {
-            onResponse();
-
-            mysql_stmt_free_result(stmt);
-        }
+        while (!mysql_stmt_fetch(stmt)) onResponse();
     }
 
     // free the memory
-    mysql_stmt_close(stmt);
+	mysql_stmt_free_result(stmt);
+    if (mysql_stmt_close(stmt)) {
+		std::cout << "Close prepared statement error" << mysql_error(this->_conn) << std::endl;
+		
+		return false;
+	}
 
     return true;
 }
