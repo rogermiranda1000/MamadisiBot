@@ -48,7 +48,7 @@ private:
 
     bool runSentence(const char *sql, MYSQL_BIND *bind = nullptr, MYSQL_BIND *result_bind = nullptr, std::function<void (void)> onResponse = nullptr);
     CMD_RESPONSE command(uint64_t server, std::string cmd, std::string args, uint64_t user);
-    bool addResponse(uint64_t server, uint64_t *posted_by, const char *post, const char *answer, const char *reaction);
+    bool addResponse(uint64_t server, uint64_t *posted_by, const char *post, const char *answer, std::string *reaction);
 	void searchResponse(uint64_t author, uint64_t server, std::string msg, SleepyDiscord::Message message);
     std::set<uint64_t> getAdmins();
     std::set<uint64_t> getWriters();
