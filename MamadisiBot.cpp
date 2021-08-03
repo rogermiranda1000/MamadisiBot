@@ -131,11 +131,14 @@ std::set<uint64_t> MamadisiBot::getSuperuser(bool isAdmin) {
 // TODO images
 bool MamadisiBot::addResponse(uint64_t server, uint64_t *posted_by, const char *post, const char *answer, std::string *reaction) {
     if (post == nullptr || !((answer == nullptr) ^ (reaction == nullptr))) return false;
-
-    /*if (posted_by != nullptr) std::cout << posted_by << std::endl;
-    if (post != nullptr) std::cout << "On '" << post << "'" << std::endl;
-    if (answer != nullptr) std::cout << "Reply '" << answer << "'" << std::endl;
-    if (*reaction != nullptr) std::cout << *reaction << std::endl;*/
+	
+	// check if 'post' is a valid regex
+	try {
+        std::regex tmp(post);
+    }
+    catch (const std::regex_error& e) {
+        return false;
+    }
 
     MYSQL_BIND *bind = (MYSQL_BIND*)malloc(sizeof(MYSQL_BIND)*3);
     memset(bind, 0, sizeof(MYSQL_BIND) * 3);
