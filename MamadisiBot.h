@@ -7,6 +7,7 @@
 #include "sleepy_discord/sleepy_discord.h"
 #include <functional> // function parameters
 #include "ImageDownloader.h"
+#include "EquationSolver.h"
 #include <mutex> // std::mutex
 #include <cassert> // assert
 
@@ -27,6 +28,7 @@
  */
 #define CMD_ADD_SYNTAX "^(?:@user (?:<@!)?(\\d+)>?" CMD_ADD_DELIMITER ")?@text (.+)" CMD_ADD_DELIMITER "(?:(?:@response (.+))|(?:@file (.+))|(?:@reaction (.+)))$"
 #define CMD_REBOOT  "reboot"
+#define CMD_MATH	"math"
 
 #define DOWNLOAD_PATH "/home/rogermiranda1000/MamadisiBotC/img/"
 

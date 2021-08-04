@@ -6,6 +6,7 @@
 static const char *HELP_RESPONSE[] = {
 	"uwu help: obtén ayuda",
 	"uwu list: muestra todas las respuestas del servidor actual", // TODO
+	"uwu math <equación>: resuelve una equación",
 	"uwu add [@user <id> | ]@text <str> | @response <str>: añade una respuesta al servidor actual usando regex",
 	"uwu add [@user <id> | ]@text <str> | @reaction <str>: añade una reacción al servidor actual usando regex",
 	"uwu add [@user <id> | ]@text <str>: [+ adjuntar imagen] añade una respuesta al servidor actual usando regex",
@@ -128,6 +129,9 @@ CMD_RESPONSE MamadisiBot::command(uint64_t server, SleepyDiscord::Snowflake<Slee
                          regexAnswer.length() > 0 ? regexAnswer.c_str() : nullptr, regexUrl.length() > 0 ? &regexUrl : nullptr,
 						 regexReaction.length() > 0 ? &regexReaction : nullptr)) return ERROR;
         return EXECUTED;
+	}
+	else if (cmd == std::string(CMD_MATH)) {
+		solveEquation(); // TODO
 	}
 	return UNKNOWN;
 }
