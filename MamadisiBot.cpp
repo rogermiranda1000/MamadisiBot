@@ -2,6 +2,22 @@
 
 #define DISCORD_EMOJI "^<:.+:\\d+>$"
 
+#define HELP_RESPONSE_LEN (sizeof(HELP_RESPONSE)/sizeof(HELP_RESPONSE[0]))
+static const char *HELP_RESPONSE[] = {
+	"uwu help: obtén ayuda",
+	"uwu list: muestra todas las respuestas del servidor actual", // TODO
+	"uwu add [@user <id> | ]@text <str> | @response <str>: añade una respuesta al servidor actual usando regex",
+	"uwu add [@user <id> | ]@text <str> | @reaction <str>: añade una reacción al servidor actual usando regex",
+	"uwu add [@user <id> | ]@text <str>: [+ adjuntar imagen] añade una respuesta al servidor actual usando regex",
+	"uwu add_literal [@user <id> | ]@text <str> | @response <str>: añade una respuesta al servidor actual usando un texto idéntico",
+	"uwu add_literal [@user <id> | ]@text <str> | @reaction <str>: añade una reacción al servidor actual usando un texto idéntico",
+	"uwu add_literal [@user <id> | ]@text <str> (+ adjuntar imagen): añade una respuesta al servidor actual usando un texto idéntico",
+	"uwu remove <id>: elimina la respuesta con el identificador 'id'", // TODO
+	"uwu list all: muestra todas las respuestas", // TODO
+	"uwu global <id>: haz una respuesta global para todos los servidores", // TODO
+	"uwu reboot: restart the computer"
+};
+
 static const char PREPARED_STMT_RESPONSE[] = "SELECT Responses.response, Responses.image, Reactions.emoji FROM Messages LEFT JOIN Responses ON Messages.id = Responses.id LEFT JOIN Reactions ON Messages.id = Reactions.id WHERE ? REGEXP Messages.message AND (Messages.sended_by IS NULL OR Messages.sended_by = ?) AND (Messages.server IS NULL OR Messages.server = ?)";
 static const char PREPARED_STMT_ADMINS[] = "SELECT id FROM Admins";
 static const char PREPARED_STMT_WRITERS[] = "SELECT id FROM Writers";
@@ -28,6 +44,7 @@ void MamadisiBot::onMessage(SleepyDiscord::Message message) {
 	if (message.author.bot || message.serverID.empty()) return;
 	uint64_t authorID = message.author.ID.number();
 	uint64_t serverID = message.serverID.number();
+	SleepyDiscord::Snowflake<SleepyDiscord::Channel> channelID = message.channelID;
 	std::string msg = message.content;
 
 	std::cout << "New message by " << authorID << " on server " << serverID << std::endl;
@@ -43,8 +60,8 @@ void MamadisiBot::onMessage(SleepyDiscord::Message message) {
 			msg	+= message.attachments.front().url;
 		}
 
-		const char *response;
-		switch (this->command(serverID, msg.substr(4, match-4) /* msg without 'uwu' prefix */,
+		const char *response = nullptr;
+		switch (this->command(serverID, channelID, msg.substr(4, match-4) /* msg without 'uwu' prefix */,
 				(match != std::string::npos) ? msg.substr(match+1) : std::string() /* arguments */, authorID)) {
             case EXECUTED:
                 response = "Comando ejecutado! uwu";
@@ -53,15 +70,17 @@ void MamadisiBot::onMessage(SleepyDiscord::Message message) {
                 response = "Ño >:(";
                 break;
             case UNKNOWN:
-                response = "Comando desconocido";
+                response = "Comando desconocido; usa 'uwu help' para ver los comandos";
                 break;
 		    case ERROR:
 		        response = "Sintaxis incorrecta";
                 break;
+			case SILENT:
+				break;
             default:
                 response = "Unknown response code";
 		}
-        this->sendMsg(message.channelID, (char*)response);
+        if (response != nullptr) this->sendMsg(channelID, (char*)response);
 	}
 	else this->searchResponse(authorID, serverID, msg, message);
 	
@@ -69,10 +88,21 @@ void MamadisiBot::onMessage(SleepyDiscord::Message message) {
 }
 
 // TODO
-CMD_RESPONSE MamadisiBot::command(uint64_t server, std::string cmd, std::string args, uint64_t user) {
+CMD_RESPONSE MamadisiBot::command(uint64_t server, SleepyDiscord::Snowflake<SleepyDiscord::Channel> channelID, std::string cmd, std::string args, uint64_t user) {
 	std::cout << "Command '" << cmd << "'" << std::endl;
 	if (cmd == std::string(CMD_HELP)) {
-	    return EXECUTED;
+		assert(HELP_RESPONSE_LEN > 0); // at least 1 message
+		
+		std::string response("```");
+		for (std::size_t x = 0; x < HELP_RESPONSE_LEN; x++) {
+			response += HELP_RESPONSE[x];
+			response += '\n';
+		}
+		response.pop_back(); // remove last '\n'
+		response += "```";
+        this->sendMessage(channelID, response);
+		
+	    return SILENT;
 	}
 	else if (cmd == std::string(CMD_REBOOT)) {
 	    if (this->_admins.find(user) == this->_admins.end()) return NO_PERMISSIONS;
