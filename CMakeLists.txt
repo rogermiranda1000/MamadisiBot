@@ -6,7 +6,7 @@ set(CMAKE_BUILD_TYPE Debug) # Debug release (gdb & valgrind)
 
 add_subdirectory(deps/sleepy-discord)
 
-add_executable(MamadisiBotC main.cpp secrets.h MamadisiBot.h MamadisiBot.cpp)
+add_executable(MamadisiBotC main.cpp secrets.h MamadisiBot.h MamadisiBot.cpp ImageDownloader.h ImageDownloader.cpp)
 
 target_link_libraries(MamadisiBotC sleepy-discord)
 target_link_libraries(MamadisiBotC mariadb)

@@ -6,6 +6,7 @@
 #include <mariadb/mysql.h>
 #include "sleepy_discord/sleepy_discord.h"
 #include <functional> // function parameters
+#include "ImageDownloader.h"
 
 // reboot includes
 #include <unistd.h>
@@ -25,7 +26,7 @@
 #define CMD_ADD_SYNTAX "^(?:@user (?:<@!)?(\\d+)>?" CMD_ADD_DELIMITER ")?@text (.+)" CMD_ADD_DELIMITER "(?:(?:@response (.+))|(?:@file (.+))|(?:@reaction (.+)))$"
 #define CMD_REBOOT  "reboot"
 
-#define DOWNLOAD_PATH "/home/rogermiranda1000/MamadisiBotC/img"
+#define DOWNLOAD_PATH "/home/rogermiranda1000/MamadisiBotC/img/"
 
 typedef enum {
     EXECUTED,

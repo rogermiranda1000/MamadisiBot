@@ -151,12 +151,20 @@ bool MamadisiBot::addResponse(uint64_t server, uint64_t *posted_by, const char *
     }
 	
 	if (img != nullptr) {
+		// check if 'img' is an url
+		if (img->rfind("https://", 0) != 0 && img->rfind("http://", 0)) return false; // it doesn't start with 'https://' nor 'http://'
+		
 		// check if 'img' is an image
 		std::size_t dot_pos = img->rfind(".");
 		if (dot_pos == std::string::npos) return false;
 		std::string format(img->substr(dot_pos + 1));
 		if (format != std::string("png") && format != std::string("jpeg")
 			&& format != std::string("jpg") && format != std::string("gif")) return false; // not an image
+		
+		// download file
+		std::string img_name = std::string(DOWNLOAD_PATH) + ImageDownloader::gen_random() + std::string(".") + format; // <path>/<random>.<format>
+		if (!ImageDownloader::download_jpeg(img_name.c_str(), img->c_str())) return false;
+		*img = img_name; // now the system path is the new name
 	}
 
     MYSQL_BIND *bind = (MYSQL_BIND*)malloc(sizeof(MYSQL_BIND)*3);
