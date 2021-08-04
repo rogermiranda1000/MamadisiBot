@@ -6,9 +6,8 @@ static const char PREPARED_STMT_RESPONSE[] = "SELECT Responses.response, Respons
 static const char PREPARED_STMT_ADMINS[] = "SELECT id FROM Admins";
 static const char PREPARED_STMT_WRITERS[] = "SELECT id FROM Writers";
 static const char PREPARED_STMT_INSERT_MESSAGE[] = "INSERT INTO Messages(server, sended_by, message) VALUE (?,?,?)";
-static const char PREPARED_STMT_INSERT_RESPONSE[] = "INSERT INTO Responses(id, response, image) VALUE (LAST_INSERT_ID(),?,NULL)"; // TODO img
+static const char PREPARED_STMT_INSERT_RESPONSE[] = "INSERT INTO Responses(id, response, image) VALUE (LAST_INSERT_ID(),?,?)";
 static const char PREPARED_STMT_INSERT_REACTION[] = "INSERT INTO Reactions(id, emoji) VALUE (LAST_INSERT_ID(),?)";
-
 
 MamadisiBot::~MamadisiBot() {
 	mysql_close(this->_conn);
@@ -32,12 +31,21 @@ void MamadisiBot::onMessage(SleepyDiscord::Message message) {
 	std::string msg = message.content;
 
 	std::cout << "New message by " << authorID << " on server " << serverID << std::endl;
+	
+	this->mtx.lock(); // only one sql search at a time
 
 	if (msg.rfind(CMD " ", 0) == 0) {
         size_t match = msg.find(' ', 4);
+		
+		// attachement
+		if (!message.attachments.empty()) {
+			msg += " | @file ";
+			msg	+= message.attachments.front().url;
+		}
 
 		const char *response;
-		switch (this->command(serverID, msg.substr(4, match-4) /* msg without 'uwu' prefix */, (match != std::string::npos) ? msg.substr(match+1) : std::string() /* arguments */, authorID)) {
+		switch (this->command(serverID, msg.substr(4, match-4) /* msg without 'uwu' prefix */,
+				(match != std::string::npos) ? msg.substr(match+1) : std::string() /* arguments */, authorID)) {
             case EXECUTED:
                 response = "Comando ejecutado! uwu";
                 break;
@@ -53,9 +61,11 @@ void MamadisiBot::onMessage(SleepyDiscord::Message message) {
             default:
                 response = "Unknown response code";
 		}
-        this->sendMsg(message.channelID,  (char*)response);
+        this->sendMsg(message.channelID, (char*)response);
 	}
 	else this->searchResponse(authorID, serverID, msg, message);
+	
+	this->mtx.unlock();
 }
 
 // TODO
@@ -78,14 +88,15 @@ CMD_RESPONSE MamadisiBot::command(uint64_t server, std::string cmd, std::string 
         std::smatch match;
         if (!std::regex_search(args, match, rgx)) return ERROR;
 
-        std::string regexUser = match.str(1), regexMsg = match.str(2), regexAnswer = match.str(3), regexReaction = match.str(4);
+        std::string regexUser = match.str(1), regexMsg = match.str(2), regexAnswer = match.str(3), regexUrl = match.str(4), regexReaction = match.str(5);
         uint64_t desired_user = atoll(regexUser.c_str());
 		
 		// literal -> begin + msg + end
         if (regexMsg.length() > 0 && cmd == std::string(CMD_ADD_LITERAL)) regexMsg = "^" + MamadisiBot::parseRegex(regexMsg) + "$";
 		
         if (!this->addResponse(server, regexUser.length() > 0 ? &desired_user : nullptr, regexMsg.length() > 0 ? regexMsg.c_str() : nullptr,
-                         regexAnswer.length() > 0 ? regexAnswer.c_str() : nullptr, regexReaction.length() > 0 ? &regexReaction : nullptr)) return ERROR;
+                         regexAnswer.length() > 0 ? regexAnswer.c_str() : nullptr, regexUrl.length() > 0 ? &regexUrl : nullptr,
+						 regexReaction.length() > 0 ? &regexReaction : nullptr)) return ERROR;
         return EXECUTED;
 	}
 	return UNKNOWN;
@@ -131,8 +142,8 @@ std::set<uint64_t> MamadisiBot::getSuperuser(bool isAdmin) {
 }
 
 // TODO images
-bool MamadisiBot::addResponse(uint64_t server, uint64_t *posted_by, const char *post, const char *answer, std::string *reaction) {
-    if (post == nullptr || !((answer == nullptr) ^ (reaction == nullptr))) return false;
+bool MamadisiBot::addResponse(uint64_t server, uint64_t *posted_by, const char *post, const char *answer, std::string *img, std::string *reaction) {
+    if (post == nullptr) return false;
 	
 	// check if 'post' is a valid regex
 	try {
@@ -141,6 +152,23 @@ bool MamadisiBot::addResponse(uint64_t server, uint64_t *posted_by, const char *
     catch (const std::regex_error& e) {
         return false;
     }
+	
+	if (img != nullptr) {
+		// check if 'img' is an url
+		if (img->rfind("https://", 0) != 0 && img->rfind("http://", 0)) return false; // it doesn't start with 'https://' nor 'http://'
+		
+		// check if 'img' is an image
+		std::size_t dot_pos = img->rfind(".");
+		if (dot_pos == std::string::npos) return false;
+		std::string format(img->substr(dot_pos + 1));
+		if (format != std::string("png") && format != std::string("jpeg")
+			&& format != std::string("jpg") && format != std::string("gif")) return false; // not an image
+		
+		// download file
+		std::string img_name = std::string(DOWNLOAD_PATH) + ImageDownloader::gen_random() + std::string(".") + format; // <path>/<random>.<format>
+		if (!ImageDownloader::download_jpeg(img_name.c_str(), img->c_str())) return false;
+		*img = img_name; // now the system path is the new name
+	}
 
     MYSQL_BIND *bind = (MYSQL_BIND*)malloc(sizeof(MYSQL_BIND)*3);
     memset(bind, 0, sizeof(MYSQL_BIND) * 3);
@@ -156,9 +184,11 @@ bool MamadisiBot::addResponse(uint64_t server, uint64_t *posted_by, const char *
     bind[1].buffer_length = sizeof(uint64_t);
 
     bind[2].buffer_type = MYSQL_TYPE_STRING;
-    if (post != nullptr) bind[2].buffer = (char*)post;
-    else bind[2].u.indicator = &null;
-    bind[2].buffer_length = strlen(post);
+    if (post == nullptr) bind[2].u.indicator = &null;
+    else {
+		bind[2].buffer = (char*)post;
+		bind[2].buffer_length = strlen(post);
+	}
 
     if (!this->runSentence(PREPARED_STMT_INSERT_MESSAGE, bind, nullptr, nullptr)) {
         free(bind);
@@ -166,19 +196,7 @@ bool MamadisiBot::addResponse(uint64_t server, uint64_t *posted_by, const char *
     }
 
     free(bind);
-    if (answer != nullptr) {
-        bind = (MYSQL_BIND*)malloc(sizeof(MYSQL_BIND)*1);
-        memset(bind, 0, sizeof(MYSQL_BIND) * 1);
-
-        bind[0].buffer_type = MYSQL_TYPE_STRING;
-        bind[0].buffer = (char*)answer;
-        bind[0].buffer_length = strlen(answer);
-
-        bool r = this->runSentence(PREPARED_STMT_INSERT_RESPONSE, bind, nullptr, nullptr);
-        free(bind);
-        return r;
-    }
-    else {
+    if (reaction != nullptr) {
         // reaction
         bind = (MYSQL_BIND*)malloc(sizeof(MYSQL_BIND)*1);
         memset(bind, 0, sizeof(MYSQL_BIND) * 1);
@@ -190,6 +208,28 @@ bool MamadisiBot::addResponse(uint64_t server, uint64_t *posted_by, const char *
         bind[0].buffer_length = reaction->length();
 		
         bool r = this->runSentence(PREPARED_STMT_INSERT_REACTION, bind, nullptr, nullptr);
+        free(bind);
+        return r;
+    }
+    else {
+        bind = (MYSQL_BIND*)malloc(sizeof(MYSQL_BIND)*2);
+        memset(bind, 0, sizeof(MYSQL_BIND) * 2);
+
+		bind[0].buffer_type = MYSQL_TYPE_STRING;
+		if (answer == nullptr) bind[0].u.indicator = &null;
+		else {
+			bind[0].buffer = (char*)answer;
+			bind[0].buffer_length = strlen(answer);
+		}
+
+        bind[1].buffer_type = MYSQL_TYPE_STRING;
+        if (img == nullptr) bind[1].u.indicator = &null;
+		else {
+			bind[1].buffer = (char*)img->c_str();
+			bind[1].buffer_length = img->length();
+		}
+
+        bool r = this->runSentence(PREPARED_STMT_INSERT_RESPONSE, bind, nullptr, nullptr);
         free(bind);
         return r;
     }

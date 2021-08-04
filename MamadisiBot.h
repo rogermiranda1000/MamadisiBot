@@ -6,6 +6,8 @@
 #include <mariadb/mysql.h>
 #include "sleepy_discord/sleepy_discord.h"
 #include <functional> // function parameters
+#include "ImageDownloader.h"
+#include <mutex> // std::mutex
 
 // reboot includes
 #include <unistd.h>
@@ -17,11 +19,15 @@
 #define CMD_ADD_LITERAL "add_literal"
 #define CMD_ADD_DELIMITER "\\s\\|\\s"
 /**
+ * [@user <id> | ]@text <str> | @response <str>[ | @file <url>] // TODO
  * [@user <id> | ]@text <str> | @response <str>
  * [@user <id> | ]@text <str> | @reaction <emoji>
+ * [@user <id> | ]@text <str> | @file <url>
  */
-#define CMD_ADD_SYNTAX "^(?:@user (?:<@!)?(\\d+)>?" CMD_ADD_DELIMITER ")?(?:@text (.+)" CMD_ADD_DELIMITER ")?(?:(?:@response (.+))|(?:@reaction (.+)))$"
+#define CMD_ADD_SYNTAX "^(?:@user (?:<@!)?(\\d+)>?" CMD_ADD_DELIMITER ")?@text (.+)" CMD_ADD_DELIMITER "(?:(?:@response (.+))|(?:@file (.+))|(?:@reaction (.+)))$"
 #define CMD_REBOOT  "reboot"
+
+#define DOWNLOAD_PATH "/home/rogermiranda1000/MamadisiBotC/img/"
 
 typedef enum {
     EXECUTED,
@@ -39,6 +45,7 @@ public:
 	void connect(const char *ip, unsigned int port, const char *user, const char *password, const char *database);
 
 private:
+	std::mutex mtx;
 	MYSQL *_conn;
     std::set<uint64_t> _admins;
     std::set<uint64_t> _writers;
@@ -48,7 +55,7 @@ private:
 
     bool runSentence(const char *sql, MYSQL_BIND *bind = nullptr, MYSQL_BIND *result_bind = nullptr, std::function<void (void)> onResponse = nullptr);
     CMD_RESPONSE command(uint64_t server, std::string cmd, std::string args, uint64_t user);
-    bool addResponse(uint64_t server, uint64_t *posted_by, const char *post, const char *answer, std::string *reaction);
+    bool addResponse(uint64_t server, uint64_t *posted_by, const char *post, const char *answer, std::string *img, std::string *reaction);
 	void searchResponse(uint64_t author, uint64_t server, std::string msg, SleepyDiscord::Message message);
     std::set<uint64_t> getAdmins();
     std::set<uint64_t> getWriters();
