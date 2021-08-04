@@ -52,6 +52,9 @@ bool ImageDownloader::download_jpeg(const char *path, const char *url) {
     return true;
 }
 
+/**
+  * Code from https://stackoverflow.com/a/440240/9178470
+  */
 std::string ImageDownloader::gen_random(const int len) {
     std::string tmp_s;
     static const char alphanum[] =

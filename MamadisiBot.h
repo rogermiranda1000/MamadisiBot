@@ -7,6 +7,7 @@
 #include "sleepy_discord/sleepy_discord.h"
 #include <functional> // function parameters
 #include "ImageDownloader.h"
+#include <mutex> // std::mutex
 
 // reboot includes
 #include <unistd.h>
@@ -44,6 +45,7 @@ public:
 	void connect(const char *ip, unsigned int port, const char *user, const char *password, const char *database);
 
 private:
+	std::mutex mtx;
 	MYSQL *_conn;
     std::set<uint64_t> _admins;
     std::set<uint64_t> _writers;

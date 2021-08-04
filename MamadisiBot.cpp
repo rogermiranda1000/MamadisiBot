@@ -9,7 +9,6 @@ static const char PREPARED_STMT_INSERT_MESSAGE[] = "INSERT INTO Messages(server,
 static const char PREPARED_STMT_INSERT_RESPONSE[] = "INSERT INTO Responses(id, response, image) VALUE (LAST_INSERT_ID(),?,?)";
 static const char PREPARED_STMT_INSERT_REACTION[] = "INSERT INTO Reactions(id, emoji) VALUE (LAST_INSERT_ID(),?)";
 
-
 MamadisiBot::~MamadisiBot() {
 	mysql_close(this->_conn);
 }
@@ -32,6 +31,8 @@ void MamadisiBot::onMessage(SleepyDiscord::Message message) {
 	std::string msg = message.content;
 
 	std::cout << "New message by " << authorID << " on server " << serverID << std::endl;
+	
+	this->mtx.lock(); // only one sql search at a time
 
 	if (msg.rfind(CMD " ", 0) == 0) {
         size_t match = msg.find(' ', 4);
@@ -63,6 +64,8 @@ void MamadisiBot::onMessage(SleepyDiscord::Message message) {
         this->sendMsg(message.channelID, (char*)response);
 	}
 	else this->searchResponse(authorID, serverID, msg, message);
+	
+	this->mtx.unlock();
 }
 
 // TODO
