@@ -28,14 +28,11 @@ void EquationSolver::solveEquation(std::string search, std::vector<std::string> 
 		if (subpod->hasImage()) *img = std::string( subpod->getImage()->getSrc() );
 	}
 	else {
-		// solution?
-		response = this->searcher->getPod("Solution");
-		if (response != nullptr) {
-			results->push_back(std::string( response->getSubpods()[0]->getPlainText() ));
-		}
-		else {
-			// >1 solution?
-			response = this->searcher->getPod("Solutions");
+		// 1 solution
+		std::vector<const char *> one_solution = {"Solution", "Numerical solution", "Complex solution", "Result", "Real solution",
+													"Solutions", "Numerical solutions", "Complex solutions", "Results", "Real solutions"};
+		for (auto searchs : one_solution) {
+			response = this->searcher->getPod(searchs);
 			if (response != nullptr) {
 				for (auto subpod : response->getSubpods()) results->push_back(std::string( subpod->getPlainText() ));
 			}
