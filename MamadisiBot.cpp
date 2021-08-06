@@ -45,7 +45,6 @@ void MamadisiBot::onMessage(SleepyDiscord::Message message) {
 	if (message.author.bot || message.serverID.empty()) return;
 	uint64_t authorID = message.author.ID.number();
 	uint64_t serverID = message.serverID.number();
-	SleepyDiscord::Snowflake<SleepyDiscord::Channel> channelID = message.channelID;
 	std::string msg = message.content;
 
 	std::cout << "New message by " << authorID << " on server " << serverID << std::endl;
@@ -62,7 +61,7 @@ void MamadisiBot::onMessage(SleepyDiscord::Message message) {
 		}
 
 		const char *response = nullptr;
-		switch (this->command(serverID, channelID, msg.substr(4, match-4) /* msg without 'uwu' prefix */,
+		switch (this->command(message, msg.substr(4, match-4) /* msg without 'uwu' prefix */,
 				(match != std::string::npos) ? msg.substr(match+1) : std::string() /* arguments */, authorID)) {
             case EXECUTED:
                 response = "Comando ejecutado! uwu";
@@ -73,15 +72,21 @@ void MamadisiBot::onMessage(SleepyDiscord::Message message) {
             case UNKNOWN:
                 response = "Comando desconocido; usa 'uwu help' para ver los comandos";
                 break;
-		    case ERROR:
+		    case SYNTAX_ERROR:
 		        response = "Sintaxis incorrecta";
+                break;
+		    case ERROR:
+		        response = "Error";
+                break;
+		    case NOT_AVALIABLE:
+		        response = "El administrador ha deshabilitado esta función";
                 break;
 			case SILENT:
 				break;
             default:
                 response = "Unknown response code";
 		}
-        if (response != nullptr) this->sendMsg(channelID, (char*)response);
+        if (response != nullptr) this->sendMsg(message.channelID, (char*)response);
 	}
 	else this->searchResponse(authorID, serverID, msg, message);
 	
@@ -89,7 +94,10 @@ void MamadisiBot::onMessage(SleepyDiscord::Message message) {
 }
 
 // TODO
-CMD_RESPONSE MamadisiBot::command(uint64_t server, SleepyDiscord::Snowflake<SleepyDiscord::Channel> channelID, std::string cmd, std::string args, uint64_t user) {
+CMD_RESPONSE MamadisiBot::command(SleepyDiscord::Message message, std::string cmd, std::string args, uint64_t user) {
+	SleepyDiscord::Snowflake<SleepyDiscord::Channel> channelID = message.channelID;
+	uint64_t server = message.serverID.number();
+	
 	std::cout << "Command '" << cmd << "'" << std::endl;
 	if (cmd == std::string(CMD_HELP)) {
 		assert(HELP_RESPONSE_LEN > 0); // at least 1 message
@@ -117,7 +125,7 @@ CMD_RESPONSE MamadisiBot::command(uint64_t server, SleepyDiscord::Snowflake<Slee
         // RegEx parse
         std::regex rgx(CMD_ADD_SYNTAX);
         std::smatch match;
-        if (!std::regex_search(args, match, rgx)) return ERROR;
+        if (!std::regex_search(args, match, rgx)) return SYNTAX_ERROR;
 
         std::string regexUser = match.str(1), regexMsg = match.str(2), regexAnswer = match.str(3), regexUrl = match.str(4), regexReaction = match.str(5);
         uint64_t desired_user = atoll(regexUser.c_str());
@@ -127,11 +135,40 @@ CMD_RESPONSE MamadisiBot::command(uint64_t server, SleepyDiscord::Snowflake<Slee
 		
         if (!this->addResponse(server, regexUser.length() > 0 ? &desired_user : nullptr, regexMsg.length() > 0 ? regexMsg.c_str() : nullptr,
                          regexAnswer.length() > 0 ? regexAnswer.c_str() : nullptr, regexUrl.length() > 0 ? &regexUrl : nullptr,
-						 regexReaction.length() > 0 ? &regexReaction : nullptr)) return ERROR;
+						 regexReaction.length() > 0 ? &regexReaction : nullptr)) return SYNTAX_ERROR;
         return EXECUTED;
 	}
 	else if (cmd == std::string(CMD_MATH)) {
-		solveEquation(); // TODO
+		if (this->_solver == nullptr) return NOT_AVALIABLE;
+		
+		std::vector<std::string> results;
+		std::string img;
+		this->_solver->solveEquation(args, &results, &img); // TODO asincrono
+		if (!results.empty()) {
+			std::string results_str("");
+			// send everything, but if you're about to exceed Discord's max lenght (2000 characters) send it
+			for (auto it : results) {
+				if (results_str.size() + it.size() + 6 /* "```<...>```" */ - 1 /* last '\n' */ > 2000) {
+					// max lenght exceeded -> send
+					if (!results_str.empty()) results_str.pop_back(); // remove last '\n'
+					this->sendMessage(channelID, std::string("```") + results_str + std::string("```"));
+					results_str = std::string("");
+				}
+				results_str += it + "\n";
+			}
+			if (!results_str.empty()) results_str.pop_back(); // remove last '\n'
+			this->sendMessage(channelID, std::string("```") + results_str + std::string("```"));
+		}
+		else if (!img.empty()) {
+			std::string img_name = std::string(DOWNLOAD_PATH) + ImageDownloader::gen_random() + std::string(".gif"); // TODO always .gif?
+			const char *img_name_ptr = img_name.c_str();
+			if (!ImageDownloader::download_img(img_name_ptr, img.c_str())) return ERROR;
+			sendImage(channelID, nullptr, (char*)img_name_ptr);
+			remove(img_name_ptr); // remove the image
+		}
+		else return EXECUTED; // nothing found
+		
+        return SILENT;
 	}
 	return UNKNOWN;
 }
@@ -200,7 +237,7 @@ bool MamadisiBot::addResponse(uint64_t server, uint64_t *posted_by, const char *
 		
 		// download file
 		std::string img_name = std::string(DOWNLOAD_PATH) + ImageDownloader::gen_random() + std::string(".") + format; // <path>/<random>.<format>
-		if (!ImageDownloader::download_jpeg(img_name.c_str(), img->c_str())) return false;
+		if (!ImageDownloader::download_img(img_name.c_str(), img->c_str())) return false;
 		*img = img_name; // now the system path is the new name
 	}
 

@@ -1,50 +1,44 @@
 #include "EquationSolver.h"
 
-void solveEquation() {
-	WAEngine search;
-	search.query.setInput("x-1=4");
-	search.query.addFormat("html");
-	search.query.addFormat("plaintext");
-	//search.setAppID(); // TODO
+EquationSolver::EquationSolver(const char *appid) {
+	this->searcher = new WAEngine(std::string(appid));
+}
 
-	string queryURL = search.getURL();
+EquationSolver::~EquationSolver() {
+	delete this->searcher;
+}
 
-	char *data;
-	search.Parse(data);
-	int numPod = search.getCountPods();
-	WAPod * pods = search.getPods();
-
-	for (int i = 0; i < numPod; i++)
-	{
-		cout << "Pod "   << i << endl;
-		cout << "Title:" << pods[i].getTitle() << endl;
-		cout << "ID:"    << pods[i].getID()    << endl;
-
-		// Get a count of sub-blocks
-		int numSubPod = pods[i].getCountSubpods();
-		int numStates = pods[i].getCountStates();
-		
-		WASubpod * subpods = pods[i].getSubpods();
-		WAPodState * states = pods[i].getStates();
-		
-		// Enumerate a subpods
-		for (int j = 0; j < numSubPod; j++)
-		{
-			cout << "\tSubPod "  << j << endl;
-			// Get a subpod attributes
-			cout << "\t\tTitle:"   << subpods[j].getTitle() << endl;
-			// Get a built-in img attributes
-			cout << "\tImg" << endl;
-			cout << "\t\tTitle:" << subpods[j].getImage()->getTitle() << endl;
-			cout << "\t\tSrc:"   << subpods[j].getImage()->getSrc() << endl;
-
+void EquationSolver::solveEquation(std::string search, std::vector<std::string> *results, std::string *img) {
+	this->searcher->query.setInput(search);
+	
+	std::string contents;
+	std::cout << "Searching '" << this->searcher->getURL() << "'..." << std::endl;
+	if (!WAEngine::DownloadURL(this->searcher->getURL(), &contents)) {
+		std::cerr << "Downloading error!" << std::endl;
+		return;
+	}
+	
+	this->searcher->Parse(contents);
+	
+	// plot?
+	WAPod *response = this->searcher->getPod("Implicit plot");
+	if (response == nullptr) response = this->searcher->getPod("Surface plot");
+	if (response != nullptr) {
+		WASubpod *subpod = response->getSubpods()[0];
+		if (subpod->hasImage()) *img = std::string( subpod->getImage()->getSrc() );
+	}
+	else {
+		// solution?
+		response = this->searcher->getPod("Solution");
+		if (response != nullptr) {
+			results->push_back(std::string( response->getSubpods()[0]->getPlainText() ));
 		}
-		
-		// Enumerate a states
-		for (int j = 0; j < numStates; j++)
-		{
-			cout << "\tStates " << j << endl;
-			cout << "\t\tName:" << states[j].getName() << endl;
+		else {
+			// >1 solution?
+			response = this->searcher->getPod("Solutions");
+			if (response != nullptr) {
+				for (auto subpod : response->getSubpods()) results->push_back(std::string( subpod->getPlainText() ));
+			}
 		}
 	}
 }
