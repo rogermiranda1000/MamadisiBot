@@ -2,6 +2,23 @@
 
 #define DISCORD_EMOJI "^<:.+:\\d+>$"
 
+#define HELP_RESPONSE_LEN (sizeof(HELP_RESPONSE)/sizeof(HELP_RESPONSE[0]))
+static const char *HELP_RESPONSE[] = {
+	"uwu help: obtén ayuda",
+	"uwu list: muestra todas las respuestas del servidor actual", // TODO
+	"uwu math <equación>: resuelve una equación",
+	"uwu add [@user <id> | ]@text <str> | @response <str>: añade una respuesta al servidor actual usando regex",
+	"uwu add [@user <id> | ]@text <str> | @reaction <str>: añade una reacción al servidor actual usando regex",
+	"uwu add [@user <id> | ]@text <str>: [+ adjuntar imagen] añade una respuesta al servidor actual usando regex",
+	"uwu add_literal [@user <id> | ]@text <str> | @response <str>: añade una respuesta al servidor actual usando un texto idéntico",
+	"uwu add_literal [@user <id> | ]@text <str> | @reaction <str>: añade una reacción al servidor actual usando un texto idéntico",
+	"uwu add_literal [@user <id> | ]@text <str> (+ adjuntar imagen): añade una respuesta al servidor actual usando un texto idéntico",
+	"uwu remove <id>: elimina la respuesta con el identificador 'id'", // TODO
+	"uwu list all: muestra todas las respuestas", // TODO
+	"uwu global <id>: haz una respuesta global para todos los servidores", // TODO
+	"uwu reboot: restart the computer"
+};
+
 static const char PREPARED_STMT_RESPONSE[] = "SELECT Responses.response, Responses.image, Reactions.emoji FROM Messages LEFT JOIN Responses ON Messages.id = Responses.id LEFT JOIN Reactions ON Messages.id = Reactions.id WHERE ? REGEXP Messages.message AND (Messages.sended_by IS NULL OR Messages.sended_by = ?) AND (Messages.server IS NULL OR Messages.server = ?)";
 static const char PREPARED_STMT_ADMINS[] = "SELECT id FROM Admins";
 static const char PREPARED_STMT_WRITERS[] = "SELECT id FROM Writers";
@@ -43,8 +60,8 @@ void MamadisiBot::onMessage(SleepyDiscord::Message message) {
 			msg	+= message.attachments.front().url;
 		}
 
-		const char *response;
-		switch (this->command(serverID, msg.substr(4, match-4) /* msg without 'uwu' prefix */,
+		const char *response = nullptr;
+		switch (this->command(message, msg.substr(4, match-4) /* msg without 'uwu' prefix */,
 				(match != std::string::npos) ? msg.substr(match+1) : std::string() /* arguments */, authorID)) {
             case EXECUTED:
                 response = "Comando ejecutado! uwu";
@@ -53,15 +70,23 @@ void MamadisiBot::onMessage(SleepyDiscord::Message message) {
                 response = "Ño >:(";
                 break;
             case UNKNOWN:
-                response = "Comando desconocido";
+                response = "Comando desconocido; usa 'uwu help' para ver los comandos";
                 break;
-		    case ERROR:
+		    case SYNTAX_ERROR:
 		        response = "Sintaxis incorrecta";
                 break;
+		    case ERROR:
+		        response = "Error";
+                break;
+		    case NOT_AVALIABLE:
+		        response = "El administrador ha deshabilitado esta función";
+                break;
+			case SILENT:
+				break;
             default:
                 response = "Unknown response code";
 		}
-        this->sendMsg(message.channelID, (char*)response);
+        if (response != nullptr) this->sendMsg(message.channelID, (char*)response);
 	}
 	else this->searchResponse(authorID, serverID, msg, message);
 	
@@ -69,10 +94,24 @@ void MamadisiBot::onMessage(SleepyDiscord::Message message) {
 }
 
 // TODO
-CMD_RESPONSE MamadisiBot::command(uint64_t server, std::string cmd, std::string args, uint64_t user) {
+CMD_RESPONSE MamadisiBot::command(SleepyDiscord::Message message, std::string cmd, std::string args, uint64_t user) {
+	SleepyDiscord::Snowflake<SleepyDiscord::Channel> channelID = message.channelID;
+	uint64_t server = message.serverID.number();
+	
 	std::cout << "Command '" << cmd << "'" << std::endl;
 	if (cmd == std::string(CMD_HELP)) {
-	    return EXECUTED;
+		assert(HELP_RESPONSE_LEN > 0); // at least 1 message
+		
+		std::string response("```");
+		for (std::size_t x = 0; x < HELP_RESPONSE_LEN; x++) {
+			response += HELP_RESPONSE[x];
+			response += '\n';
+		}
+		response.pop_back(); // remove last '\n'
+		response += "```";
+        this->sendMessage(channelID, response);
+		
+	    return SILENT;
 	}
 	else if (cmd == std::string(CMD_REBOOT)) {
 	    if (this->_admins.find(user) == this->_admins.end()) return NO_PERMISSIONS;
@@ -86,7 +125,7 @@ CMD_RESPONSE MamadisiBot::command(uint64_t server, std::string cmd, std::string 
         // RegEx parse
         std::regex rgx(CMD_ADD_SYNTAX);
         std::smatch match;
-        if (!std::regex_search(args, match, rgx)) return ERROR;
+        if (!std::regex_search(args, match, rgx)) return SYNTAX_ERROR;
 
         std::string regexUser = match.str(1), regexMsg = match.str(2), regexAnswer = match.str(3), regexUrl = match.str(4), regexReaction = match.str(5);
         uint64_t desired_user = atoll(regexUser.c_str());
@@ -96,8 +135,40 @@ CMD_RESPONSE MamadisiBot::command(uint64_t server, std::string cmd, std::string 
 		
         if (!this->addResponse(server, regexUser.length() > 0 ? &desired_user : nullptr, regexMsg.length() > 0 ? regexMsg.c_str() : nullptr,
                          regexAnswer.length() > 0 ? regexAnswer.c_str() : nullptr, regexUrl.length() > 0 ? &regexUrl : nullptr,
-						 regexReaction.length() > 0 ? &regexReaction : nullptr)) return ERROR;
+						 regexReaction.length() > 0 ? &regexReaction : nullptr)) return SYNTAX_ERROR;
         return EXECUTED;
+	}
+	else if (cmd == std::string(CMD_MATH)) {
+		if (this->_solver == nullptr) return NOT_AVALIABLE;
+		
+		std::vector<std::string> results;
+		std::string img;
+		this->_solver->solveEquation(args, &results, &img); // TODO asincrono
+		if (!results.empty()) {
+			std::string results_str("");
+			// send everything, but if you're about to exceed Discord's max lenght (2000 characters) send it
+			for (auto it : results) {
+				if (results_str.size() + it.size() + 6 /* "```<...>```" */ - 1 /* last '\n' */ > 2000) {
+					// max lenght exceeded -> send
+					if (!results_str.empty()) results_str.pop_back(); // remove last '\n'
+					this->sendMessage(channelID, std::string("```") + results_str + std::string("```"));
+					results_str = std::string("");
+				}
+				results_str += it + "\n";
+			}
+			if (!results_str.empty()) results_str.pop_back(); // remove last '\n'
+			this->sendMessage(channelID, std::string("```") + results_str + std::string("```"));
+		}
+		else if (!img.empty()) {
+			std::string img_name = std::string(DOWNLOAD_PATH) + ImageDownloader::gen_random() + std::string(".gif"); // TODO always .gif?
+			const char *img_name_ptr = img_name.c_str();
+			if (!ImageDownloader::download_img(img_name_ptr, img.c_str())) return ERROR;
+			sendImage(channelID, nullptr, (char*)img_name_ptr);
+			remove(img_name_ptr); // remove the image
+		}
+		else return EXECUTED; // nothing found
+		
+        return SILENT;
 	}
 	return UNKNOWN;
 }
@@ -166,7 +237,7 @@ bool MamadisiBot::addResponse(uint64_t server, uint64_t *posted_by, const char *
 		
 		// download file
 		std::string img_name = std::string(DOWNLOAD_PATH) + ImageDownloader::gen_random() + std::string(".") + format; // <path>/<random>.<format>
-		if (!ImageDownloader::download_jpeg(img_name.c_str(), img->c_str())) return false;
+		if (!ImageDownloader::download_img(img_name.c_str(), img->c_str())) return false;
 		*img = img_name; // now the system path is the new name
 	}
 
