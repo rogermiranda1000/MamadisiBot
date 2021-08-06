@@ -1,6 +1,6 @@
 #pragma once
 
-#include <stdio.h> // fwrite
+#include <stdio.h> // fwrite & remove
 #include <unistd.h> // check if file exists
 #include <iostream> // print the error messages
 #include <curl/curl.h> // download from website
@@ -9,7 +9,7 @@
 
 class ImageDownloader {
 public:
-	static bool download_jpeg(const char *path, const char *url);
+	static bool download_img(const char *path, const char *url);
 	static std::string gen_random(const int len = RANDOM_TEXT_LEN);
 	
 private:

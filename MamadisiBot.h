@@ -7,6 +7,7 @@
 #include "sleepy_discord/sleepy_discord.h"
 #include <functional> // function parameters
 #include "ImageDownloader.h"
+#include "EquationSolver.h"
 #include <mutex> // std::mutex
 #include <cassert> // assert
 
@@ -27,6 +28,7 @@
  */
 #define CMD_ADD_SYNTAX "^(?:@user (?:<@!)?(\\d+)>?" CMD_ADD_DELIMITER ")?@text (.+)" CMD_ADD_DELIMITER "(?:(?:@response (.+))|(?:@file (.+))|(?:@reaction (.+)))$"
 #define CMD_REBOOT  "reboot"
+#define CMD_MATH	"math"
 
 #define DOWNLOAD_PATH "/home/rogermiranda1000/MamadisiBotC/img/"
 
@@ -35,11 +37,16 @@ typedef enum {
 	SILENT,				// executed, but say nothing
     NO_PERMISSIONS,		// the user doesn't have the required permissions to use that command
     UNKNOWN,			// unknown command
-    ERROR				// an error has occurred while executing the command
+	NOT_AVALIABLE,		// disabled by the admin
+    ERROR,				// an error has occurred while executing the command
+	SYNTAX_ERROR		// malformated command
 } CMD_RESPONSE;
 
 class MamadisiBot : public SleepyDiscord::DiscordClient {
 public:
+	MamadisiBot(const char *token, int mode, EquationSolver *solver) : SleepyDiscord::DiscordClient(token, mode) { // TODO tipos exactos?
+		this->_solver = solver;
+	}
 	~MamadisiBot();
 
 	using SleepyDiscord::DiscordClient::DiscordClient;
@@ -51,12 +58,13 @@ private:
 	MYSQL *_conn;
     std::set<uint64_t> _admins;
     std::set<uint64_t> _writers;
+	EquationSolver *_solver;
 
     static void rebootServer();
     static std::string parseRegex(std::string str);
 
     bool runSentence(const char *sql, MYSQL_BIND *bind = nullptr, MYSQL_BIND *result_bind = nullptr, std::function<void (void)> onResponse = nullptr);
-    CMD_RESPONSE command(uint64_t server, SleepyDiscord::Snowflake<SleepyDiscord::Channel> channelID, std::string cmd, std::string args, uint64_t user);
+    CMD_RESPONSE command(SleepyDiscord::Message message, std::string cmd, std::string args, uint64_t user);
     bool addResponse(uint64_t server, uint64_t *posted_by, const char *post, const char *answer, std::string *img, std::string *reaction);
 	void searchResponse(uint64_t author, uint64_t server, std::string msg, SleepyDiscord::Message message);
     std::set<uint64_t> getAdmins();

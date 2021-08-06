@@ -16,7 +16,7 @@ size_t ImageDownloader::callbackfunction(void *ptr, size_t size, size_t nmemb, v
 /**
   * Code from https://stackoverflow.com/a/36702936/9178470
   */
-bool ImageDownloader::download_jpeg(const char *path, const char *url) {
+bool ImageDownloader::download_img(const char *path, const char *url) {
 	if(access(path, F_OK) == 0) return false; // file already exists
 	
     FILE* fp = nullptr;
