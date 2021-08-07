@@ -72,5 +72,6 @@ private:
     std::set<uint64_t> getSuperuser(bool isAdmin);
     void react(SleepyDiscord::Message message, char *emoji);
     void sendMsg(SleepyDiscord::Snowflake<SleepyDiscord::Channel> channel, char *msg);
+	void sendLargeMessage(SleepyDiscord::Snowflake<SleepyDiscord::Channel> channel, std::vector<std::string> strings);
     void sendImage(SleepyDiscord::Snowflake<SleepyDiscord::Channel> channel, char *msg, char *img);
 };

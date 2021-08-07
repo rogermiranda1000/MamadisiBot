@@ -144,21 +144,7 @@ CMD_RESPONSE MamadisiBot::command(SleepyDiscord::Message message, std::string cm
 		std::vector<std::string> results;
 		std::string img;
 		this->_solver->solveEquation(args, &results, &img); // TODO asincrono
-		if (!results.empty()) {
-			std::string results_str("");
-			// send everything, but if you're about to exceed Discord's max lenght (2000 characters) send it
-			for (auto it : results) {
-				if (results_str.size() + it.size() + 6 /* "```<...>```" */ - 1 /* last '\n' */ > 2000) {
-					// max lenght exceeded -> send
-					if (!results_str.empty()) results_str.pop_back(); // remove last '\n'
-					this->sendMessage(channelID, std::string("```") + results_str + std::string("```"));
-					results_str = std::string("");
-				}
-				results_str += it + "\n";
-			}
-			if (!results_str.empty()) results_str.pop_back(); // remove last '\n'
-			this->sendMessage(channelID, std::string("```") + results_str + std::string("```"));
-		}
+		if (!results.empty()) this->sendLargeMessage(channelID, results);
 		else if (!img.empty()) {
 			std::string img_name = std::string(DOWNLOAD_PATH) + ImageDownloader::gen_random() + std::string(".gif"); // TODO always .gif?
 			const char *img_name_ptr = img_name.c_str();
@@ -396,14 +382,6 @@ void MamadisiBot::searchResponse(uint64_t author, uint64_t server, std::string m
 	};
 
     this->runSentence(PREPARED_STMT_RESPONSE, bind, result_bind, onResponse);
-
-
-
-
-	// other tests
-	/*if (message.startsWith("uwu 1")) sendMessage(message.channelID, "Hello " + message.author.username);
-	else if (message.startsWith("uwu 3")) uploadFile(message.channelID, "/home/rogermiranda1000/MamadisiBotC/img/pufferfish.gif", "");
-	else if (message.startsWith("uwu 4")) addReaction(message.channelID, message, "<:mt:808810079536939078");  mt emoji */
 }
 
 void MamadisiBot::connect(const char *ip, unsigned int port, const char *user, const char *password, const char *database) {
@@ -425,6 +403,26 @@ void MamadisiBot::react(SleepyDiscord::Message message, char *emoji) {
 
 void MamadisiBot::sendMsg(SleepyDiscord::Snowflake<SleepyDiscord::Channel> channel, char *msg) {
     this->sendMessage(channel, std::string(msg));
+}
+
+/**
+ *	Send everything on \p strings, but if you're about to exceed Discord's max lenght (2000 characters) send it
+ */
+void MamadisiBot::sendLargeMessage(SleepyDiscord::Snowflake<SleepyDiscord::Channel> channel, std::vector<std::string> strings) {
+	if (!strings.empty()) {
+		std::string results_str("");
+		for (auto it : strings) {
+			if (results_str.size() + it.size() + 6 /* "```<...>```" */ - 1 /* last '\n' */ > 2000) {
+				// max lenght exceeded -> send
+				if (!results_str.empty()) results_str.pop_back(); // remove last '\n'
+				this->sendMessage(channel, std::string("```") + results_str + std::string("```"));
+				results_str = std::string("");
+			}
+			results_str += it + "\n";
+		}
+		if (!results_str.empty()) results_str.pop_back(); // remove last '\n'
+		this->sendMessage(channel, std::string("```") + results_str + std::string("```"));
+	}
 }
 
 void MamadisiBot::sendImage(SleepyDiscord::Snowflake<SleepyDiscord::Channel> channel, char *msg, char *img) {

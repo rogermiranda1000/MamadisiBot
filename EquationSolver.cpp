@@ -23,13 +23,15 @@ void EquationSolver::solveEquation(std::string search, std::vector<std::string> 
 	// plot?
 	WAPod *response = this->searcher->getPod("Implicit plot");
 	if (response == nullptr) response = this->searcher->getPod("Surface plot");
+	if (response == nullptr) response = this->searcher->getPod("Plot");
+	if (response == nullptr) response = this->searcher->getPod("Plots");
 	if (response != nullptr) {
 		WASubpod *subpod = response->getSubpods()[0];
 		if (subpod->hasImage()) *img = std::string( subpod->getImage()->getSrc() );
 	}
 	else {
-		// 1 solution
-		std::vector<const char *> one_solution = {"Solution", "Numerical solution", "Complex solution", "Result", "Real solution",
+		// solution?
+		std::vector<const char *> one_solution = {"Solution", "Numerical solution", "Complex solution", "Result", "Real solution", "Decimal approximation"
 													"Solutions", "Numerical solutions", "Complex solutions", "Results", "Real solutions"};
 		for (auto searchs : one_solution) {
 			response = this->searcher->getPod(searchs);
