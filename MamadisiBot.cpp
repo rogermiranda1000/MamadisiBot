@@ -143,7 +143,8 @@ CMD_RESPONSE MamadisiBot::command(SleepyDiscord::Message message, std::string cm
 		
 		std::vector<std::string> results;
 		std::string img;
-		this->_solver->solveEquation(args, &results, &img); // TODO asincrono
+		// TODO asincrono
+		if (!this->_solver->solveEquation(args, &results, &img)) return ERROR;
 		if (!results.empty()) this->sendLargeMessage(channelID, results);
 		else if (!img.empty()) {
 			std::string img_name = std::string(DOWNLOAD_PATH) + ImageDownloader::gen_random() + std::string(".gif"); // TODO always .gif?
