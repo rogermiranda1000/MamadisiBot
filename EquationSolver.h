@@ -8,8 +8,8 @@ public:
 	EquationSolver(const char *appid);
 	~EquationSolver();
 	
-	bool solveEquation(std::string search, std::vector<std::string> *results, std::string *img);
+	bool solveEquation(std::string search_str, std::vector<std::string> *results, std::string *img);
 	
 private:
-	WAEngine *searcher;
+	WAEngine *_searcher;
 };
