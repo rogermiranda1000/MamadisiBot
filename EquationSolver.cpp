@@ -2,6 +2,16 @@
 
 EquationSolver::EquationSolver(const char *appid) {
 	this->_searcher = new WAEngine(std::string(appid));
+	
+	/* all related with math results */
+	// exact results
+	this->_searcher->query.addIncludePodID("Result");
+	//this->_searcher->query.addIncludePodID("LocusSolution"); // ex. 'a!=0, y = 5/a'
+	
+	// plots
+	this->_searcher->query.addIncludePodID("SurfacePlot");
+	this->_searcher->query.addIncludePodID("Plot");
+	this->_searcher->query.addIncludePodID("ImplicitPlot");
 }
 
 EquationSolver::~EquationSolver() {

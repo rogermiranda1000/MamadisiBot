@@ -44,7 +44,7 @@ typedef enum {
 
 class MamadisiBot : public SleepyDiscord::DiscordClient {
 public:
-	MamadisiBot(const char *token, int mode, EquationSolver *solver) : SleepyDiscord::DiscordClient(token, mode) { // TODO tipos exactos?
+	MamadisiBot(const char *token, SleepyDiscord::Mode mode, EquationSolver *solver) : SleepyDiscord::DiscordClient(token, mode) {
 		this->_solver = solver;
 	}
 	~MamadisiBot();
