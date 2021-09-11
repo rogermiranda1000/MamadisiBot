@@ -3,6 +3,7 @@
 #include <iostream> // print the error messages
 #include <set>
 #include <regex>
+#include <string>
 #include <mariadb/mysql.h>
 #include "sleepy_discord/sleepy_discord.h"
 #include <functional> // function parameters
@@ -44,7 +45,8 @@ typedef enum {
 
 class MamadisiBot : public SleepyDiscord::DiscordClient {
 public:
-	MamadisiBot(const char *token, int mode, EquationSolver *solver) : SleepyDiscord::DiscordClient(token, mode) { // TODO tipos exactos?
+	MamadisiBot(const char *token, int mode, EquationSolver *solver) : SleepyDiscord::DiscordClient(token, mode) {
+		this->_conn = nullptr;
 		this->_solver = solver;
 	}
 	~MamadisiBot();
@@ -59,10 +61,18 @@ private:
     std::set<uint64_t> _admins;
     std::set<uint64_t> _writers;
 	EquationSolver *_solver;
+	
+	std::string _ip;
+	unsigned int _port;
+	std::string _user;
+	std::string _password;
+	std::string _database;
+	
 
     static void rebootServer();
     static std::string parseRegex(std::string str);
 
+	MYSQL_STMT *getStatement();
     bool runSentence(const char *sql, MYSQL_BIND *bind = nullptr, MYSQL_BIND *result_bind = nullptr, std::function<void (void)> onResponse = nullptr);
     CMD_RESPONSE command(SleepyDiscord::Message message, std::string cmd, std::string args, uint64_t user);
     bool addResponse(uint64_t server, uint64_t *posted_by, const char *post, const char *answer, std::string *img, std::string *reaction);
@@ -73,4 +83,5 @@ private:
     void react(SleepyDiscord::Message message, char *emoji);
     void sendMsg(SleepyDiscord::Snowflake<SleepyDiscord::Channel> channel, char *msg);
     void sendImage(SleepyDiscord::Snowflake<SleepyDiscord::Channel> channel, char *msg, char *img);
+	bool connect();
 };

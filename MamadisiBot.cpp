@@ -27,7 +27,7 @@ static const char PREPARED_STMT_INSERT_RESPONSE[] = "INSERT INTO Responses(id, r
 static const char PREPARED_STMT_INSERT_REACTION[] = "INSERT INTO Reactions(id, emoji) VALUE (LAST_INSERT_ID(),?)";
 
 MamadisiBot::~MamadisiBot() {
-	mysql_close(this->_conn);
+	if (this->_conn != nullptr) mysql_close(this->_conn);
 }
 
 void MamadisiBot::rebootServer() {
@@ -306,37 +306,48 @@ bool MamadisiBot::addResponse(uint64_t server, uint64_t *posted_by, const char *
     }
 }
 
-bool MamadisiBot::runSentence(const char *sql, MYSQL_BIND *bind, MYSQL_BIND *result_bind, std::function<void (void)> onResponse) {
-    MYSQL_STMT *stmt = nullptr;
+MYSQL_STMT *MamadisiBot::getStatement() {
+	MYSQL_STMT *stmt = nullptr;
+	
+	if (true) { // TODO check if sesion expired
+		// sesion exprired; re-connect
+		if (!this->connect()) return nullptr;
+	}
+	
+	stmt = mysql_stmt_init(this->_conn);
+    return stmt;
+}
 
-    stmt = mysql_stmt_init(this->_conn);
+bool MamadisiBot::runSentence(const char *sql, MYSQL_BIND *bind, MYSQL_BIND *result_bind, std::function<void (void)> onResponse) {
+    MYSQL_STMT *stmt = this->getStatement();
+
     if (stmt == nullptr) {
         std::cout << "Init prepared statement error" << std::endl;
         return false; // it makes no sense to continue
     }
 
     if (mysql_stmt_prepare(stmt, sql, strlen(sql)) != 0) {
-        std::cout << "Init prepared statement error" << mysql_stmt_error(stmt) << std::endl;
+        std::cout << "Init prepared statement error: " << mysql_stmt_error(stmt) << std::endl;
         return false; // it makes no sense to continue
     }
 
     if (bind != nullptr) {
         if (mysql_stmt_bind_param(stmt, bind)) {
-            std::cout << "Prepared statement bind error" << std::endl;
+            std::cout << "Prepared statement bind error: " << std::endl;
             mysql_stmt_close(stmt);
             return false; // it makes no sense to continue
         }
     }
 
     if (mysql_stmt_execute(stmt)) {
-        std::cout << "Prepared statement error" << mysql_stmt_error(stmt) << std::endl;
+        std::cout << "Prepared statement error: " << mysql_stmt_error(stmt) << std::endl;
         mysql_stmt_close(stmt);
         return false; // it makes no sense to continue
     }
 
     if (result_bind != nullptr) {
         if (mysql_stmt_bind_result(stmt, result_bind)) {
-            std::cout << "Prepared statement return error" << mysql_stmt_error(stmt) << std::endl;
+            std::cout << "Prepared statement return error: " << mysql_stmt_error(stmt) << std::endl;
             mysql_stmt_close(stmt);
             return false;
         }
@@ -347,7 +358,7 @@ bool MamadisiBot::runSentence(const char *sql, MYSQL_BIND *bind, MYSQL_BIND *res
     // free the memory
 	mysql_stmt_free_result(stmt);
     if (mysql_stmt_close(stmt)) {
-		std::cout << "Close prepared statement error" << mysql_error(this->_conn) << std::endl;
+		std::cout << "Close prepared statement error: " << mysql_error(this->_conn) << std::endl;
 		
 		return false;
 	}
@@ -396,28 +407,41 @@ void MamadisiBot::searchResponse(uint64_t author, uint64_t server, std::string m
 	};
 
     this->runSentence(PREPARED_STMT_RESPONSE, bind, result_bind, onResponse);
-
-
-
-
-	// other tests
-	/*if (message.startsWith("uwu 1")) sendMessage(message.channelID, "Hello " + message.author.username);
-	else if (message.startsWith("uwu 3")) uploadFile(message.channelID, "/home/rogermiranda1000/MamadisiBotC/img/pufferfish.gif", "");
-	else if (message.startsWith("uwu 4")) addReaction(message.channelID, message, "<:mt:808810079536939078");  mt emoji */
 }
 
 void MamadisiBot::connect(const char *ip, unsigned int port, const char *user, const char *password, const char *database) {
-	// Establish Connection
-	this->_conn = mysql_init(NULL);
+	this->_ip = std::string(ip);
+	this->_port = port;
+	this->_user = std::string(user);
+	this->_password = std::string(password);
+	this->_database = std::string(database);
 
-	if(!mysql_real_connect(this->_conn, ip, user,password, database, port, NULL, 0)) {
-		std::cout << "Connection Error: " << mysql_error(this->_conn) << std::endl;
-		exit(EXIT_FAILURE);
-	}
-
+	if (!this->connect()) exit(EXIT_FAILURE);
+	
     this->_admins = this->getAdmins();
     this->_writers = this->getWriters();
 }
+
+/**
+ * It connects to mariadb server with the credentials setted on connect(const char *ip, unsigned int port, const char *user, const char *password, const char *database)
+ * @retval TRUE Succesfull connection
+ * @retval FLASE Failure
+ */
+bool MamadisiBot::connect() {
+	// Close previous connection (if any)
+	if (this->_conn != nullptr) mysql_close(this->_conn);
+	
+	// Establish connection
+	this->_conn = mysql_init(NULL);
+
+	if(!mysql_real_connect(this->_conn, this->_ip.c_str(), this->_user.c_str(), this->_password.c_str(), this->_database.c_str(), this->_port, NULL, 0)) {
+		std::cout << "Connection Error: " << mysql_error(this->_conn) << std::endl;
+		return false;
+	}
+	
+	return true;
+}
+
 
 void MamadisiBot::react(SleepyDiscord::Message message, char *emoji) {
     this->addReaction(message.channelID, message, std::string(emoji));

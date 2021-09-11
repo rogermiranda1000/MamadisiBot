@@ -8,33 +8,32 @@ EquationSolver::~EquationSolver() {
 	delete this->searcher;
 }
 
-void EquationSolver::solveEquation(std::string search, std::vector<std::string> *results, std::string *img) {
-	this->searcher->query.setInput(search);
-	
+void EquationSolver::solveEquation(std::string searchURL, std::vector<std::string> *results, std::string *img) {
 	std::string contents;
-	std::cout << "Searching '" << this->searcher->getURL() << "'..." << std::endl;
-	if (!WAEngine::DownloadURL(this->searcher->getURL(), &contents)) {
+	std::string url = this->searcher->getURL(searchURL);
+	std::cout << "Searching '" << url << "'..." << std::endl;
+	if (!WAEngine::DownloadURL(url, &contents)) {
 		std::cerr << "Downloading error!" << std::endl;
 		return;
 	}
 	
-	this->searcher->Parse(contents);
+	WAResult search = this->searcher->getResult(contents);
 	
 	// plot?
-	WAPod *response = this->searcher->getPod("Implicit plot");
-	if (response == nullptr) response = this->searcher->getPod("Surface plot");
-	if (response != nullptr) {
-		WASubpod *subpod = response->getSubpods()[0];
-		if (subpod->hasImage()) *img = std::string( subpod->getImage()->getSrc() );
+	WAPod response;
+	bool found = search.getPod("Implicit plot", &response);
+	if (!found) found = search.getPod("Surface plot", &response);
+	if (found) {
+		WASubpod subpod = response.getSubpods()[0];
+		if (subpod.hasImage()) *img = std::string( subpod.getImage()->getSrc() );
 	}
 	else {
 		// 1 solution
 		std::vector<const char *> one_solution = {"Solution", "Numerical solution", "Complex solution", "Result", "Real solution",
 													"Solutions", "Numerical solutions", "Complex solutions", "Results", "Real solutions"};
 		for (auto searchs : one_solution) {
-			response = this->searcher->getPod(searchs);
-			if (response != nullptr) {
-				for (auto subpod : response->getSubpods()) results->push_back(std::string( subpod->getPlainText() ));
+			if (search.getPod(searchs, &response)) {
+				for (auto subpod : response.getSubpods()) results->push_back(std::string( subpod.getPlainText() ));
 			}
 		}
 	}
