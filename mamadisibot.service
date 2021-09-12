@@ -1,0 +1,10 @@
+[Unit]
+Description=MamadisiBot en C
+After=mysql.service
+
+[Service]
+Type=simple
+ExecStart=/home/rogermiranda1000/MamadisiBotC/build/MamadisiBotC
+
+[Install]
+WantedBy=multi-user.target
