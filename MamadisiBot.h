@@ -12,6 +12,9 @@
 #include <mutex> // std::mutex
 #include <cassert> // assert
 
+#include <thread> // sql auto-stop
+#include <chrono>
+
 // reboot includes
 #include <unistd.h>
 #include <sys/reboot.h>
@@ -30,6 +33,11 @@
 #define CMD_ADD_SYNTAX "^(?:@user (?:<@!)?(\\d+)>?" CMD_ADD_DELIMITER ")?@text (.+)" CMD_ADD_DELIMITER "(?:(?:@response (.+))|(?:@file (.+))|(?:@reaction (.+)))$"
 #define CMD_REBOOT  "reboot"
 #define CMD_MATH	"math"
+
+/**
+ * Once the connection is stablished, wait 100s until logout
+ */
+#define SQL_TIMEOUT 100
 
 #define DOWNLOAD_PATH "/home/rogermiranda1000/MamadisiBotC/img/"
 

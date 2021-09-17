@@ -309,7 +309,7 @@ bool MamadisiBot::addResponse(uint64_t server, uint64_t *posted_by, const char *
 MYSQL_STMT *MamadisiBot::getStatement() {
 	MYSQL_STMT *stmt = nullptr;
 	
-	if (true) { // TODO check if sesion expired
+	if (this->_conn == nullptr) {
 		// sesion exprired; re-connect
 		if (!this->connect()) return nullptr;
 	}
@@ -322,32 +322,32 @@ bool MamadisiBot::runSentence(const char *sql, MYSQL_BIND *bind, MYSQL_BIND *res
     MYSQL_STMT *stmt = this->getStatement();
 
     if (stmt == nullptr) {
-        std::cout << "Init prepared statement error" << std::endl;
+        std::cerr << "Init prepared statement error" << std::endl;
         return false; // it makes no sense to continue
     }
 
     if (mysql_stmt_prepare(stmt, sql, strlen(sql)) != 0) {
-        std::cout << "Init prepared statement error: " << mysql_stmt_error(stmt) << std::endl;
+        std::cerr << "Init prepared statement error: " << mysql_stmt_error(stmt) << std::endl;
         return false; // it makes no sense to continue
     }
 
     if (bind != nullptr) {
         if (mysql_stmt_bind_param(stmt, bind)) {
-            std::cout << "Prepared statement bind error: " << std::endl;
+            std::cerr << "Prepared statement bind error: " << std::endl;
             mysql_stmt_close(stmt);
             return false; // it makes no sense to continue
         }
     }
 
     if (mysql_stmt_execute(stmt)) {
-        std::cout << "Prepared statement error: " << mysql_stmt_error(stmt) << std::endl;
+        std::cerr << "Prepared statement error: " << mysql_stmt_error(stmt) << std::endl;
         mysql_stmt_close(stmt);
         return false; // it makes no sense to continue
     }
 
     if (result_bind != nullptr) {
         if (mysql_stmt_bind_result(stmt, result_bind)) {
-            std::cout << "Prepared statement return error: " << mysql_stmt_error(stmt) << std::endl;
+            std::cerr << "Prepared statement return error: " << mysql_stmt_error(stmt) << std::endl;
             mysql_stmt_close(stmt);
             return false;
         }
@@ -358,7 +358,7 @@ bool MamadisiBot::runSentence(const char *sql, MYSQL_BIND *bind, MYSQL_BIND *res
     // free the memory
 	mysql_stmt_free_result(stmt);
     if (mysql_stmt_close(stmt)) {
-		std::cout << "Close prepared statement error: " << mysql_error(this->_conn) << std::endl;
+		std::cerr << "Close prepared statement error: " << mysql_error(this->_conn) << std::endl;
 		
 		return false;
 	}
@@ -424,6 +424,7 @@ void MamadisiBot::connect(const char *ip, unsigned int port, const char *user, c
 
 /**
  * It connects to mariadb server with the credentials setted on connect(const char *ip, unsigned int port, const char *user, const char *password, const char *database)
+ * @pre this->_conn == nullptr [or it will create more than one logoutAfterSomeSeconds threads]
  * @retval TRUE Succesfull connection
  * @retval FLASE Failure
  */
@@ -435,9 +436,23 @@ bool MamadisiBot::connect() {
 	this->_conn = mysql_init(NULL);
 
 	if(!mysql_real_connect(this->_conn, this->_ip.c_str(), this->_user.c_str(), this->_password.c_str(), this->_database.c_str(), this->_port, NULL, 0)) {
-		std::cout << "Connection Error: " << mysql_error(this->_conn) << std::endl;
+		std::cerr << "Connection Error: " << mysql_error(this->_conn) << std::endl;
 		return false;
 	}
+	
+	// create the auto-logout
+	std::thread t([this](){
+		std::this_thread::sleep_for(std::chrono::seconds(SQL_TIMEOUT));
+		
+		this->mtx.lock();
+		
+		std::cout << "SQL AFK timeout; closing connection..." << std::endl;
+		if (this->_conn != nullptr) mysql_close(this->_conn);
+		this->_conn = nullptr;
+		
+		this->mtx.unlock();
+	});
+	t.detach();
 	
 	return true;
 }
